@@ -10,137 +10,239 @@
     --paper: #e8dfc4;
     --ink: #2b2620;
     --accent: #a8863f;
+    --margin-bg: #14140f;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0;
     background: var(--bg);
     color: #d8d2c2;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    min-height: 100vh;
-    display: flex;
+    height: 100vh; height: 100dvh;
+    overflow: hidden;
+  }
+
+  /* ---------- 縦向き案内 ---------- */
+  #rotate-notice {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 999;
     flex-direction: column;
-    align-items: center;
-  }
-  header {
-    width: 100%; max-width: 900px;
-    padding: 24px 20px 8px;
+    align-items: center; justify-content: center;
     text-align: center;
+    padding: 40px;
   }
-  header h1 {
+  #rotate-notice .icon { font-size: 3rem; margin-bottom: 16px; }
+  #rotate-notice h2 { color: var(--accent); font-family: Georgia, serif; letter-spacing: 2px; margin: 0 0 10px; }
+  #rotate-notice p { color: #8a8370; font-size: 0.9rem; max-width: 320px; line-height: 1.6; }
+  body.is-portrait #rotate-notice { display: flex; }
+  body.is-portrait #app { display: none; }
+
+  /* ---------- 全体レイアウト(横向き2分割) ---------- */
+  #app {
+    display: flex;
+    height: 100%;
+  }
+
+  /* ---------- 左：本文ページ ---------- */
+  .book-col {
+    flex: 0 0 62%;
+    max-width: 62%;
+    display: flex; flex-direction: column;
+    position: relative;
+    border-right: 1px solid #221f16;
+  }
+  .book-header {
+    padding: calc(env(safe-area-inset-top) + 14px) 20px 8px;
+    text-align: center;
+    flex: none;
+  }
+  .book-header h1 {
     font-family: Georgia, serif;
     letter-spacing: 4px;
-    font-size: 1.4rem;
+    font-size: 1.15rem;
     color: var(--accent);
     margin: 0;
   }
-  header .subtitle {
-    font-size: 0.75rem;
-    color: #6b6656;
-    letter-spacing: 2px;
-    margin-top: 4px;
-  }
-  .page-wrap {
-    width: 100%; max-width: 700px;
+  .book-header .subtitle { font-size: 0.65rem; color: #6b6656; letter-spacing: 2px; margin-top: 2px; }
+
+  .page-scroll {
     flex: 1;
-    display: flex; flex-direction: column;
-    align-items: center;
-    padding: 20px;
+    overflow-y: auto;
+    padding: 10px 26px 10px;
+    display: flex;
+    justify-content: center;
   }
   .page {
     background: var(--paper);
     color: var(--ink);
     border-radius: 4px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-    padding: 40px 36px;
+    padding: 34px 34px;
     width: 100%;
-    min-height: 400px;
+    max-width: 640px;
+    height: fit-content;
     font-family: Georgia, serif;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     line-height: 1.85;
   }
-  .jp-panel {
-    background: #17190f;
-    color: #b9b39c;
-    border-radius: 4px;
-    border: 1px solid #2c2a1c;
-    padding: 24px 28px;
-    width: 100%;
-    margin-top: 14px;
-    font-size: 0.95rem;
-    line-height: 1.9;
-    display: none;
-  }
-  .jp-panel.show { display: block; }
-  .jp-label {
-    font-size: 0.7rem;
-    color: var(--accent);
-    letter-spacing: 2px;
-    margin-bottom: 10px;
-  }
-  .toggle-row {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    margin-top: 14px;
-  }
-  .toggle-btn {
-    background: none;
-    border: 1px solid #3a3527;
-    color: var(--accent);
-    border-radius: 20px;
-    padding: 8px 20px;
-    font-size: 0.85rem;
+  .page .word {
     cursor: pointer;
+    border-bottom: 1px dotted rgba(43,38,32,0.35);
   }
-  .page-num {
-    margin-top: 16px;
-    color: #8a8370;
-    font-size: 0.85rem;
-    letter-spacing: 1px;
+  .page .word.tapped {
+    border-bottom: 1px solid var(--accent);
+    color: #7a5a1e;
   }
-  .nav-row {
-    display: flex; gap: 12px;
-    width: 100%; max-width: 700px;
-    padding: 0 20px 30px;
+
+  .book-footer {
+    flex: none;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
   }
-  button.nav-btn {
+  .book-footer button {
     flex: 1;
     background: #1a1d1a;
     color: var(--accent);
     border: 1px solid #3a3527;
     border-radius: 8px;
-    padding: 14px;
-    font-size: 1rem;
-    cursor: pointer;
+    padding: 12px;
+    font-size: 0.95rem;
   }
-  button.nav-btn:disabled { opacity: 0.35; }
+  .book-footer button:disabled { opacity: 0.35; }
+  .page-num { flex: none; color: #8a8370; font-size: 0.8rem; min-width: 56px; text-align: center; }
+  .btn-jp-toggle {
+    flex: none !important;
+    background: none !important;
+    border: 1px solid #3a3527 !important;
+    color: var(--accent) !important;
+    border-radius: 20px !important;
+    padding: 10px 16px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* ---------- 日本語訳: 本文カラムだけに重なるボトムシート ---------- */
+  .jp-sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: #17190f;
+    color: #b9b39c;
+    border-top: 1px solid #3a3527;
+    border-radius: 14px 14px 0 0;
+    padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
+    max-height: 55%;
+    overflow-y: auto;
+    font-size: 0.92rem;
+    line-height: 1.85;
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+  }
+  .jp-sheet.show { transform: translateY(0); }
+  .jp-sheet .jp-label { font-size: 0.68rem; color: var(--accent); letter-spacing: 2px; margin-bottom: 10px; }
+
+  /* ---------- 右：欄外メモ(単語帳) ---------- */
+  .margin-col {
+    flex: 1;
+    background: var(--margin-bg);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .margin-header {
+    flex: none;
+    padding: calc(env(safe-area-inset-top) + 14px) 18px 10px;
+    border-bottom: 1px dashed #2c2a1c;
+  }
+  .margin-header .label {
+    font-family: Georgia, serif;
+    font-style: italic;
+    color: var(--accent);
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+  }
+  .margin-header .hint {
+    font-size: 0.68rem;
+    color: #6b6656;
+    margin-top: 4px;
+  }
+  .margin-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+  }
+  .margin-empty {
+    color: #55503f;
+    font-size: 0.82rem;
+    font-style: italic;
+    text-align: center;
+    margin-top: 30px;
+    line-height: 1.7;
+  }
+  .margin-note {
+    font-family: Georgia, serif;
+    color: #cbc4a8;
+    border-bottom: 1px dashed #2c2a1c;
+    padding: 10px 2px 12px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    transform: rotate(var(--tilt, 0deg));
+  }
+  .margin-note .mn-word {
+    color: var(--accent);
+    font-weight: bold;
+    font-style: italic;
+  }
+  .margin-note .mn-meaning {
+    display: block;
+    margin-top: 4px;
+    color: #a8a084;
+    font-size: 0.85rem;
+  }
+  .margin-note .mn-loading { color: #6b6656; font-size: 0.8rem; }
 </style>
 </head>
 <body>
 
-  <header>
-    <h1>D A G O N</h1>
-    <div class="subtitle">H. P. LOVECRAFT</div>
-  </header>
-
-  <div class="page-wrap">
-    <div class="page" id="page-text"></div>
-
-    <div class="toggle-row">
-      <button class="toggle-btn" id="btn-toggle-jp">日本語訳を見る</button>
-    </div>
-    <div class="jp-panel" id="jp-panel">
-      <div class="jp-label">フレーバーテキスト (日本語訳)</div>
-      <div id="jp-text"></div>
-    </div>
-
-    <div class="page-num" id="page-num"></div>
+  <div id="rotate-notice">
+    <div class="icon">&#8635;</div>
+    <h2>横向きにしてください</h2>
+    <p>この書物は、横向きに構えた状態で読むよう作られています。<br>iPadを回転させてください。</p>
   </div>
 
-  <div class="nav-row">
-    <button class="nav-btn" id="btn-prev">前へ</button>
-    <button class="nav-btn" id="btn-next">次へ</button>
+  <div id="app">
+    <div class="book-col">
+      <div class="book-header">
+        <h1>D A G O N</h1>
+        <div class="subtitle">H. P. LOVECRAFT</div>
+      </div>
+
+      <div class="page-scroll">
+        <div class="page" id="page-text"></div>
+      </div>
+
+      <div class="jp-sheet" id="jp-sheet">
+        <div class="jp-label">フレーバーテキスト (日本語訳)</div>
+        <div id="jp-text"></div>
+      </div>
+
+      <div class="book-footer">
+        <button id="btn-prev">前へ</button>
+        <div class="page-num" id="page-num"></div>
+        <button id="btn-next">次へ</button>
+        <button class="btn-jp-toggle" id="btn-toggle-jp">訳</button>
+      </div>
+    </div>
+
+    <div class="margin-col">
+      <div class="margin-header">
+        <div class="label">欄外の書き込み</div>
+        <div class="hint">気になる単語をタップすると、ここに記録されます</div>
+      </div>
+      <div class="margin-list" id="margin-list">
+        <div class="margin-empty">まだ何も書き込まれていない</div>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -149,26 +251,111 @@
 
   let current = 0;
   let jpVisible = false;
+  // ページごとの欄外メモ(単語タップ履歴)。ページを離れても保持し、戻ったら復元する
+  const marginNotesByPage = {};
+
+  function cleanWord(raw) {
+    return raw.replace(/[.,!?;:"'\u2018\u2019\u201c\u201d()]/g, '');
+  }
+
+  function renderPageText(text) {
+    const container = document.getElementById('page-text');
+    container.innerHTML = '';
+    const words = text.split(/\s+/);
+    words.forEach(function(w, i) {
+      const span = document.createElement('span');
+      span.className = 'word';
+      span.textContent = w;
+      const key = cleanWord(w).toLowerCase();
+      span.dataset.word = key;
+      span.addEventListener('click', function() {
+        onWordTap(key, span);
+      });
+      container.appendChild(span);
+      container.appendChild(document.createTextNode(' '));
+    });
+  }
+
+  function renderMarginList() {
+    const listEl = document.getElementById('margin-list');
+    const notes = marginNotesByPage[current] || [];
+    listEl.innerHTML = '';
+    if (notes.length === 0) {
+      listEl.innerHTML = '<div class="margin-empty">まだ何も書き込まれていない</div>';
+      return;
+    }
+    notes.forEach(function(note) {
+      const div = document.createElement('div');
+      div.className = 'margin-note';
+      div.style.setProperty('--tilt', (Math.random() * 1.6 - 0.8) + 'deg');
+      if (note.loading) {
+        div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-loading">　調べています…</span>';
+      } else {
+        div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-meaning">' + note.meaning + '</span>';
+      }
+      listEl.appendChild(div);
+    });
+    listEl.scrollTop = listEl.scrollHeight;
+  }
+
+  function markTappedWordsOnPage() {
+    const notes = marginNotesByPage[current] || [];
+    const tappedWords = new Set(notes.map(function(n) { return n.key; }));
+    document.querySelectorAll('#page-text .word').forEach(function(span) {
+      if (tappedWords.has(span.dataset.word)) span.classList.add('tapped');
+      else span.classList.remove('tapped');
+    });
+  }
+
+  function onWordTap(key, span) {
+    if (!key) return;
+    if (!marginNotesByPage[current]) marginNotesByPage[current] = [];
+    // 既にこのページで調べた単語なら、重複追加しない
+    if (marginNotesByPage[current].some(function(n) { return n.key === key; })) return;
+
+    const note = { key: key, word: key, meaning: '', loading: true };
+    marginNotesByPage[current].push(note);
+    span.classList.add('tapped');
+    renderMarginList();
+
+    // 単語の意味の取得は次のステップで実装（今は仮のダミー表示）
+    setTimeout(function() {
+      note.loading = false;
+      note.meaning = '（意味の自動取得は準備中）';
+      renderMarginList();
+    }, 400);
+  }
 
   function render() {
-    document.getElementById('page-text').textContent = pagesEn[current];
+    renderPageText(pagesEn[current]);
     document.getElementById('jp-text').textContent = pagesJp[current];
     document.getElementById('page-num').textContent = (current + 1) + " / " + pagesEn.length;
     document.getElementById('btn-prev').disabled = current === 0;
     document.getElementById('btn-next').disabled = current === pagesEn.length - 1;
+    markTappedWordsOnPage();
+    renderMarginList();
+    document.querySelector('.page-scroll').scrollTop = 0;
   }
 
   document.getElementById('btn-prev').addEventListener('click', function() {
-    if (current > 0) { current--; render(); window.scrollTo(0, 0); }
+    if (current > 0) { current--; render(); }
   });
   document.getElementById('btn-next').addEventListener('click', function() {
-    if (current < pagesEn.length - 1) { current++; render(); window.scrollTo(0, 0); }
+    if (current < pagesEn.length - 1) { current++; render(); }
   });
   document.getElementById('btn-toggle-jp').addEventListener('click', function() {
     jpVisible = !jpVisible;
-    document.getElementById('jp-panel').classList.toggle('show', jpVisible);
-    this.textContent = jpVisible ? '日本語訳を隠す' : '日本語訳を見る';
+    document.getElementById('jp-sheet').classList.toggle('show', jpVisible);
   });
+
+  // ---------- 縦向き検知 ----------
+  function checkOrientation() {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('is-portrait', isPortrait);
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
+  checkOrientation();
 
   render();
 </script>
