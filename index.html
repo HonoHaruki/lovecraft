@@ -15,7 +15,9 @@
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0;
-    background: var(--bg);
+    background:
+      radial-gradient(ellipse 900px 700px at 50% -10%, rgba(60,50,25,0.10), transparent 60%),
+      var(--bg);
     color: #d8d2c2;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     height: 100vh; height: 100dvh;
@@ -75,10 +77,14 @@
     justify-content: center;
   }
   .page {
-    background: var(--paper);
+    position: relative;
+    background:
+      radial-gradient(ellipse 140px 100px at 96% 4%, rgba(120,90,40,0.16), transparent 70%),
+      radial-gradient(ellipse 180px 140px at 4% 98%, rgba(90,70,30,0.14), transparent 70%),
+      var(--paper);
     color: var(--ink);
     border-radius: 4px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 60px rgba(90,70,30,0.12);
     padding: 34px 34px;
     width: 100%;
     max-width: 640px;
@@ -86,6 +92,28 @@
     font-family: Georgia, serif;
     font-size: 1.1rem;
     line-height: 1.85;
+    overflow: hidden;
+  }
+  .page::before {
+    /* 紙の繊維質感(粒状ノイズ) */
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    mix-blend-mode: multiply;
+    background-image:
+      repeating-radial-gradient(circle at 20% 30%, rgba(60,50,25,0.05) 0, transparent 2px),
+      repeating-radial-gradient(circle at 70% 65%, rgba(60,50,25,0.05) 0, transparent 2px),
+      repeating-radial-gradient(circle at 45% 85%, rgba(60,50,25,0.04) 0, transparent 2px);
+    background-size: 3px 3px, 4px 4px, 5px 5px;
+  }
+  .page::first-letter {
+    float: left;
+    font-size: 3.1em;
+    line-height: 0.78;
+    padding: 4px 8px 0 0;
+    color: var(--accent);
+    font-family: Georgia, serif;
   }
   .page .word {
     cursor: pointer;
@@ -100,6 +128,10 @@
     flex: none;
     display: flex; align-items: center; gap: 10px;
     padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
+    position: relative;
+    z-index: 10;
+    background: var(--bg);
+    border-top: 1px solid #221f16;
   }
   .book-footer button {
     flex: 1;
@@ -125,12 +157,13 @@
   /* ---------- 日本語訳: 本文カラムだけに重なるボトムシート ---------- */
   .jp-sheet {
     position: absolute;
-    left: 0; right: 0; bottom: 0;
+    left: 0; right: 0;
+    bottom: var(--footer-h, 64px);
     background: #17190f;
     color: #b9b39c;
     border-top: 1px solid #3a3527;
     border-radius: 14px 14px 0 0;
-    padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
+    padding: 20px 24px 20px;
     max-height: 55%;
     overflow-y: auto;
     font-size: 0.92rem;
@@ -138,6 +171,7 @@
     transform: translateY(100%);
     transition: transform 0.25s ease;
     box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+    z-index: 5;
   }
   .jp-sheet.show { transform: translateY(0); }
   .jp-sheet .jp-label { font-size: 0.68rem; color: var(--accent); letter-spacing: 2px; margin-bottom: 10px; }
@@ -154,6 +188,69 @@
     padding: calc(env(safe-area-inset-top) + 14px) 18px 10px;
     border-bottom: 1px dashed #2c2a1c;
   }
+  .margin-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .btn-settings {
+    flex: none;
+    background: none;
+    border: 1px solid #3a3527;
+    color: #8a8370;
+    border-radius: 50%;
+    width: 30px; height: 30px;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0;
+  }
+  .btn-settings.needs-key { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- 設定モーダル ---------- */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--paper);
+    color: var(--ink);
+    width: min(420px, 86vw);
+    border-radius: 6px;
+    padding: 26px 26px 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    font-family: Georgia, serif;
+  }
+  .modal-box h3 { margin: 0 0 6px; font-size: 1.05rem; letter-spacing: 1px; }
+  .modal-box p { margin: 0 0 14px; font-size: 0.82rem; line-height: 1.6; color: #55503f; }
+  .modal-box input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(43,38,32,0.3);
+    border-radius: 4px;
+    background: #f4eed9;
+    color: var(--ink);
+    font-size: 0.9rem;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-actions button {
+    border: 1px solid #3a3527;
+    background: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+  .modal-actions .btn-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .margin-note.error .mn-meaning { color: #a05a4a; font-style: italic; cursor: pointer; }
+
   .margin-header .label {
     font-family: Georgia, serif;
     font-style: italic;
@@ -182,11 +279,14 @@
   .margin-note {
     font-family: Georgia, serif;
     color: #cbc4a8;
+    background: linear-gradient(180deg, rgba(232,223,196,0.045), transparent 70%);
     border-bottom: 1px dashed #2c2a1c;
-    padding: 10px 2px 12px;
+    padding: 10px 8px 12px;
+    margin: 0 -8px;
     font-size: 0.92rem;
     line-height: 1.6;
     transform: rotate(var(--tilt, 0deg));
+    box-shadow: 0 1px 0 rgba(0,0,0,0.3);
   }
   .margin-note .mn-word {
     color: var(--accent);
@@ -236,11 +336,26 @@
 
     <div class="margin-col">
       <div class="margin-header">
-        <div class="label">欄外の書き込み</div>
+        <div class="margin-header-row">
+          <div class="label">欄外の書き込み</div>
+          <button id="btn-settings" class="btn-settings" aria-label="設定">&#9881;</button>
+        </div>
         <div class="hint">気になる単語をタップすると、ここに記録されます</div>
       </div>
       <div class="margin-list" id="margin-list">
         <div class="margin-empty">まだ何も書き込まれていない</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal-box">
+      <h3>Gemini APIキー</h3>
+      <p>単語の意味をAIに問い合わせるために使います。キーは端末内にのみ保存され、外部には送信されません。</p>
+      <input type="text" id="api-key-input" placeholder="AIzaSy..." autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="modal-actions">
+        <button id="btn-settings-cancel">キャンセル</button>
+        <button class="btn-save" id="btn-settings-save">保存</button>
       </div>
     </div>
   </div>
@@ -253,6 +368,33 @@
   let jpVisible = false;
   // ページごとの欄外メモ(単語タップ履歴)。ページを離れても保持し、戻ったら復元する
   const marginNotesByPage = {};
+
+  // ---------- APIキー管理 ----------
+  function getApiKey() {
+    return localStorage.getItem('lovecraft_gemini_key') || '';
+  }
+  function setApiKey(key) {
+    localStorage.setItem('lovecraft_gemini_key', key);
+    updateSettingsButtonState();
+  }
+  function updateSettingsButtonState() {
+    document.getElementById('btn-settings').classList.toggle('needs-key', !getApiKey());
+  }
+
+  // ---------- 単語の意味キャッシュ(端末内保存、同じ単語を何度も問い合わせない) ----------
+  function loadMeaningCache() {
+    try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveMeaningToCache(pageIndex, word, meaning) {
+    const cache = loadMeaningCache();
+    cache[pageIndex + ':' + word] = meaning;
+    localStorage.setItem('lovecraft_word_meanings', JSON.stringify(cache));
+  }
+  function getMeaningFromCache(pageIndex, word) {
+    const cache = loadMeaningCache();
+    return cache[pageIndex + ':' + word];
+  }
 
   function cleanWord(raw) {
     return raw.replace(/[.,!?;:"'\u2018\u2019\u201c\u201d()]/g, '');
@@ -286,12 +428,17 @@
     }
     notes.forEach(function(note) {
       const div = document.createElement('div');
-      div.className = 'margin-note';
+      div.className = 'margin-note' + (note.error ? ' error' : '');
       div.style.setProperty('--tilt', (Math.random() * 1.6 - 0.8) + 'deg');
       if (note.loading) {
         div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-loading">　調べています…</span>';
       } else {
         div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-meaning">' + note.meaning + '</span>';
+        if (note.error) {
+          div.querySelector('.mn-meaning').addEventListener('click', function() {
+            fetchWordMeaning(note);
+          });
+        }
       }
       listEl.appendChild(div);
     });
@@ -313,17 +460,69 @@
     // 既にこのページで調べた単語なら、重複追加しない
     if (marginNotesByPage[current].some(function(n) { return n.key === key; })) return;
 
-    const note = { key: key, word: key, meaning: '', loading: true };
+    const note = { key: key, word: key, meaning: '', loading: true, error: false };
     marginNotesByPage[current].push(note);
     span.classList.add('tapped');
     renderMarginList();
+    fetchWordMeaning(note);
+  }
 
-    // 単語の意味の取得は次のステップで実装（今は仮のダミー表示）
-    setTimeout(function() {
+  async function fetchWordMeaning(note) {
+    const pageIndex = current;
+    const cached = getMeaningFromCache(pageIndex, note.key);
+    if (cached) {
       note.loading = false;
-      note.meaning = '（意味の自動取得は準備中）';
+      note.error = false;
+      note.meaning = cached;
       renderMarginList();
-    }, 400);
+      return;
+    }
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      note.loading = false;
+      note.error = false;
+      note.meaning = 'APIキー未設定（右上の設定から入力してください）';
+      renderMarginList();
+      return;
+    }
+
+    note.loading = true;
+    note.error = false;
+    renderMarginList();
+
+    const paragraphEn = pagesEn[pageIndex];
+    const paragraphJp = pagesJp[pageIndex];
+    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中で、単語「' + note.word + '」がどのような意味・ニュアンスで使われているかを、日本語で40字前後で簡潔に説明してください。' +
+      '辞書的な訳語だけでなく、この文脈でのニュアンスも踏まえてください。出力は説明文のみとし、前置き・記号・引用符は付けないでください。\n\n' +
+      '英文: ' + paragraphEn + '\n\n' +
+      '参考(日本語訳): ' + paragraphJp + '\n\n' +
+      '対象の単語: ' + note.word;
+
+    try {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + encodeURIComponent(apiKey), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const text = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
+        data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
+        data.candidates[0].content.parts[0].text;
+      if (!text || !text.trim()) throw new Error('空の応答');
+      const meaning = text.trim();
+      note.meaning = meaning;
+      note.loading = false;
+      note.error = false;
+      saveMeaningToCache(pageIndex, note.key, meaning);
+    } catch (e) {
+      console.warn('単語の意味取得に失敗:', e);
+      note.loading = false;
+      note.error = true;
+      note.meaning = '取得に失敗しました（タップで再試行）';
+    }
+    renderMarginList();
   }
 
   function render() {
@@ -347,6 +546,36 @@
     jpVisible = !jpVisible;
     document.getElementById('jp-sheet').classList.toggle('show', jpVisible);
   });
+
+  // ---------- 操作バーの高さをCSS変数に反映(日本語訳シートがバーと重ならないようにする) ----------
+  function syncFooterHeight() {
+    const footer = document.querySelector('.book-footer');
+    if (footer) {
+      document.documentElement.style.setProperty('--footer-h', footer.offsetHeight + 'px');
+    }
+  }
+  window.addEventListener('resize', syncFooterHeight);
+  window.addEventListener('orientationchange', syncFooterHeight);
+  syncFooterHeight();
+
+  // ---------- 設定モーダル ----------
+  const settingsModal = document.getElementById('settings-modal');
+  const apiKeyInput = document.getElementById('api-key-input');
+  document.getElementById('btn-settings').addEventListener('click', function() {
+    apiKeyInput.value = getApiKey();
+    settingsModal.classList.add('show');
+  });
+  document.getElementById('btn-settings-cancel').addEventListener('click', function() {
+    settingsModal.classList.remove('show');
+  });
+  document.getElementById('btn-settings-save').addEventListener('click', function() {
+    setApiKey(apiKeyInput.value.trim());
+    settingsModal.classList.remove('show');
+  });
+  settingsModal.addEventListener('click', function(e) {
+    if (e.target === settingsModal) settingsModal.classList.remove('show');
+  });
+  updateSettingsButtonState();
 
   // ---------- 縦向き検知 ----------
   function checkOrientation() {
