@@ -87,17 +87,27 @@
       radial-gradient(ellipse 180px 140px at 4% 98%, rgba(90,70,30,0.14), transparent 70%),
       var(--paper);
     color: var(--ink);
-    border-radius: 4px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 60px rgba(90,70,30,0.12);
-    padding: 34px 34px;
+    padding: 44px 34px;
     width: 100%;
     max-width: 640px;
     height: fit-content;
-    font-family: 'EB Garamond', Georgia, serif;
+    font-family: 'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
     font-size: 1.22rem;
     letter-spacing: 0.2px;
     line-height: 1.9;
     overflow: hidden;
+    transform: rotate(-0.35deg);
+    /* box-shadowはclip-pathで切り取られると消えてしまうため、drop-shadowフィルタで影を付ける */
+    filter: drop-shadow(0 14px 26px rgba(0,0,0,0.55));
+    /* 手で破いたような、はっきりわかる不揃いな紙端(上下) */
+    clip-path: polygon(
+      0% 2.2%, 3% 0.3%, 6% 3.1%, 10% 0.6%, 14% 2.6%, 19% 0.2%, 24% 3.4%, 29% 0.8%,
+      35% 2.4%, 41% 0.3%, 47% 3.0%, 53% 0.5%, 59% 2.8%, 65% 0.2%, 71% 3.2%, 77% 0.6%,
+      83% 2.6%, 89% 0.3%, 94% 3.0%, 100% 0.8%,
+      100% 97.6%, 94% 99.5%, 89% 96.8%, 83% 99.3%, 77% 97.0%, 71% 99.6%, 65% 96.9%,
+      59% 99.4%, 53% 97.1%, 47% 99.5%, 41% 96.8%, 35% 99.3%, 29% 97.0%, 24% 99.6%,
+      19% 96.9%, 14% 99.4%, 10% 97.1%, 6% 99.5%, 3% 96.8%, 0% 98.9%
+    );
   }
   .page::before {
     /* 紙の繊維質感(実際の紙のような不規則なノイズ) */
@@ -108,6 +118,13 @@
     mix-blend-mode: multiply;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 0.15  0 0 0 0 0.12  0 0 0 0 0.06  0 0 0 0.35 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
     background-size: 220px 220px;
+  }
+  .page::after {
+    /* 紙の縁の焼け込み(内側から暗くなるビネット) */
+    content: '';
+    position: absolute; inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 70px rgba(90,60,20,0.35);
   }
   .page::first-letter {
     float: left;
@@ -168,27 +185,41 @@
   }
 
   /* ---------- 日本語訳: 本文カラムだけに重なるボトムシート ---------- */
+  /* max-height の割合計算はブラウザ差で崩れやすいため、top/bottomを直接固定して
+     高さを確定させ、内部を独立してスクロールさせる構成にしている */
   .jp-sheet {
     position: absolute;
     left: 0; right: 0;
+    top: 70px;
     bottom: var(--footer-h, 64px);
     background: #17190f;
     color: #b9b39c;
     border-top: 1px solid #3a3527;
     border-radius: 14px 14px 0 0;
-    padding: 20px 24px 20px;
-    max-height: calc(82dvh - var(--footer-h, 64px));
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
     font-size: 0.92rem;
     line-height: 1.85;
-    transform: translateY(100%);
+    transform: translateY(105%);
     transition: transform 0.25s ease;
     box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
     z-index: 5;
   }
   .jp-sheet.show { transform: translateY(0); }
-  .jp-sheet .jp-label { font-size: 0.68rem; color: var(--accent); letter-spacing: 2px; margin-bottom: 10px; }
+  .jp-sheet .jp-label {
+    flex: none;
+    padding: 20px 24px 10px;
+    font-size: 0.68rem;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+  .jp-sheet #jp-text {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 24px 22px;
+  }
 
   /* ---------- 右：欄外メモ(単語帳) ---------- */
   .margin-col {
@@ -263,7 +294,7 @@
   }
   .modal-actions .btn-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
-  .margin-note.error .mn-error-text {
+  .mn-error-text {
     color: #a05a4a;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     font-size: 0.85rem;
@@ -282,9 +313,10 @@
     word-break: break-word;
   }
   .word-sheet-box .ws-pos {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: #8a7a52;
-    letter-spacing: 1px;
+    font-style: italic;
+    letter-spacing: 0.5px;
     margin-bottom: 16px;
   }
   .ws-extend-row {
@@ -321,8 +353,9 @@
   .ws-preview-block { margin-bottom: 8px; }
   .ws-preview-block:last-child { margin-bottom: 0; }
   .ws-preview-label { display: block; font-size: 0.7rem; color: #8a7a52; letter-spacing: 1px; margin-bottom: 2px; }
-  .ws-preview-general { font-size: 0.9rem; color: var(--ink); }
-  .ws-preview-contextual { font-size: 0.95rem; color: #5a4020; font-family: Georgia, serif; font-style: italic; }
+  /* 辞書的な意味の方をあえて目立たせ、文脈での意味は控えめにする(先に文脈だけ読んで済ませないように) */
+  .ws-preview-general { font-size: 1.05rem; color: var(--ink); font-weight: 600; }
+  .ws-preview-contextual { font-size: 0.85rem; color: #7a7256; }
 
   .margin-header .label {
     font-family: 'EB Garamond', Georgia, serif;
@@ -370,6 +403,13 @@
     font-weight: 700;
     font-size: 1.3rem;
   }
+  .margin-note .mn-phonetic {
+    display: block;
+    color: #6b6656;
+    font-size: 0.85rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    margin-top: 1px;
+  }
   .margin-note .mn-block {
     display: block;
     margin-top: 6px;
@@ -380,13 +420,15 @@
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     margin-right: 4px;
   }
+  /* 辞書的な意味の方をあえて目立たせ、文脈での意味は控えめにする(先に文脈だけ読んで済ませないように) */
   .margin-note .mn-general {
-    color: #a8a084;
-    font-size: 1.05rem;
+    color: #e4dcc0;
+    font-size: 1.15rem;
+    font-weight: 600;
   }
   .margin-note .mn-contextual {
-    color: #d7cba0;
-    font-size: 1.1rem;
+    color: #8a8370;
+    font-size: 0.9rem;
   }
   .margin-note .mn-loading {
     color: #6b6656;
@@ -542,13 +584,13 @@
 
   // ---------- 単語の意味キャッシュ(端末内保存、同じ単語を何度も問い合わせない) ----------
   function loadMeaningCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings_v2') || '{}'); }
     catch (e) { return {}; }
   }
   function saveMeaningToCache(pageIndex, word, meaningObj) {
     const cache = loadMeaningCache();
     cache[pageIndex + ':' + word] = meaningObj;
-    localStorage.setItem('lovecraft_word_meanings', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_word_meanings_v2', JSON.stringify(cache));
   }
   function getMeaningFromCache(pageIndex, word) {
     const cache = loadMeaningCache();
@@ -561,13 +603,13 @@
 
   // ---------- ページ単位のAIハイライト(注目すべき単語・熟語)キャッシュ ----------
   function loadPageHighlightCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_page_highlights') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_page_highlights_v2') || '{}'); }
     catch (e) { return {}; }
   }
   function savePageHighlightCache(pageIndex, phrases) {
     const cache = loadPageHighlightCache();
     cache[pageIndex] = phrases;
-    localStorage.setItem('lovecraft_page_highlights', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_page_highlights_v2', JSON.stringify(cache));
   }
 
   // 該当ページの本文からトークン列(小文字・記号除去)を作る
@@ -618,7 +660,8 @@
         ranges: ranges,
         general: item.meaningGeneral || '',
         contextual: item.meaningContextual || '',
-        pos: item.pos || ''
+        pos: item.partOfSpeech || '',
+        pronunciation: item.pronunciation || ''
       });
       ranges.forEach(function(r) {
         for (let i = r.start; i <= r.end; i++) { indexMap[i] = groupIdx; }
@@ -649,11 +692,13 @@
       '・文中でひとまとまりの意味を持つ熟語・慣用句・句動詞(例: cast myself, no longer)\n' +
       '・"not so much A as B" や "the 比較級 A, the 比較級 B" のように、Aの部分とBの部分が文中で離れた位置にある構文(飛び飛びの語句)。この場合はAとBそれぞれの原文表記を"parts"に順番通り2つ入れてください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
-      '選んだ語句それぞれについて、意味を次の2種類に分けて書いてください。\n' +
+      '選んだ語句それぞれについて、以下の情報も付けてください。\n' +
+      '・partOfSpeech: 単語の場合は実際の品詞(名詞/動詞/形容詞/副詞/前置詞など)、熟語・句動詞・構文の場合はその種別(熟語/句動詞/慣用句/構文)\n' +
+      '・pronunciation: 単語の場合は発音記号(IPA、例: /dɪˈdʒɛnərət/)。熟語・構文などで発音記号が馴染まない場合は空文字でよい\n' +
       '・meaningGeneral: 一般的な辞書に載っているような、文脈に依存しない簡潔な訳語（15字以内、説明的な文章にしない）\n' +
       '・meaningContextual: この文章の中でその語句がどう使われているか、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度で)\n\n' +
       '出力は次のJSON配列の形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '[{"parts":["原文での表記そのまま"],"pos":"単語/熟語/句動詞/構文のいずれか","meaningGeneral":"...","meaningContextual":"..."}]\n' +
+      '[{"parts":["原文での表記そのまま"],"partOfSpeech":"...","pronunciation":"...","meaningGeneral":"...","meaningContextual":"..."}]\n' +
       '(飛び飛びの構文の場合はpartsに["Aの原文表記","Bの原文表記"]のように2つ入れてください)';
 
     try {
@@ -717,12 +762,66 @@
       const div = document.createElement('div');
       div.className = 'margin-note';
       div.style.setProperty('--tilt', (Math.random() * 1.6 - 0.8) + 'deg');
-      div.innerHTML = '<span class="mn-word">' + note.word + '</span>' +
-        (note.general ? '<span class="mn-block"><span class="mn-label">辞書的には</span><span class="mn-general">' + note.general + '</span></span>' : '') +
-        (note.contextual ? '<span class="mn-block"><span class="mn-label">この場面では</span><span class="mn-contextual">' + note.contextual + '</span></span>' : '');
+      const phoneticLine = (note.pronunciation || note.pos)
+        ? '<span class="mn-phonetic">' + [note.pronunciation, note.pos].filter(Boolean).join('　・　') + '</span>' : '';
+      if (note._repairing) {
+        div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
+          '<span class="mn-block mn-loading">意味を辿っています…</span>';
+      } else if (!note.general && !note.contextual) {
+        // 過去のバージョンで意味が空のまま保存されてしまったメモを、タップで取得し直せるようにする
+        div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
+          '<span class="mn-block mn-error-text">意味を取得できていません（タップで再取得）</span>';
+        div.querySelector('.mn-error-text').addEventListener('click', function() {
+          repairMarginNote(note);
+        });
+      } else {
+        div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
+          (note.general ? '<span class="mn-block"><span class="mn-label">辞書的には</span><span class="mn-general">' + note.general + '</span></span>' : '') +
+          (note.contextual ? '<span class="mn-block"><span class="mn-label">この場面では</span><span class="mn-contextual">' + note.contextual + '</span></span>' : '');
+      }
       listEl.appendChild(div);
     });
     listEl.scrollTop = listEl.scrollHeight;
+  }
+
+  // 過去のバージョンなどで意味が空のまま保存されてしまったメモを、その場で取得し直す
+  async function repairMarginNote(note) {
+    const apiKey = getApiKey();
+    if (!apiKey) return;
+    note._repairing = true;
+    renderMarginList();
+
+    const paragraphEn = pagesEn[note.pageIndex];
+    const paragraphJp = pagesJp[note.pageIndex];
+    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中の「' + note.word + '」という語句について日本語で説明してください。' +
+      'これが熟語・句動詞・慣用句・離れた位置にある構文である場合は、その旨も踏まえてください。\n\n' +
+      '英文: ' + paragraphEn + '\n\n' +
+      '参考(日本語訳): ' + paragraphJp + '\n\n' +
+      '対象の語句: ' + note.word + '\n\n' +
+      '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
+      '{"partOfSpeech":"単語なら実際の品詞(名詞/動詞/形容詞など)、熟語等ならその種別(熟語/句動詞/慣用句/構文)",' +
+      '"pronunciation":"単語なら発音記号(IPA)。熟語等で馴染まなければ空文字",' +
+      '"meaningGeneral":"一般的な辞書のような、文脈に依存しない簡潔な訳語(15字以内)",' +
+      '"meaningContextual":"この文中での使われ方を、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度)"}';
+
+    try {
+      const raw = await callGemini(prompt);
+      const jsonStr = raw.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(jsonStr);
+      const general = (parsed.meaningGeneral || '').trim();
+      const contextual = (parsed.meaningContextual || '').trim();
+      if (!general && !contextual) throw new Error('空の応答');
+      note.general = general;
+      note.contextual = contextual;
+      note.pos = (parsed.partOfSpeech || '').trim();
+      note.pronunciation = (parsed.pronunciation || '').trim();
+      saveMeaningToCache(note.pageIndex, note.key, { general: note.general, contextual: note.contextual, pos: note.pos, pronunciation: note.pronunciation });
+      saveMarginNotesToStorage();
+    } catch (e) {
+      console.warn('メモの再取得に失敗:', e);
+    }
+    note._repairing = false;
+    renderMarginList();
   }
 
   function markTappedWordsOnPage() {
@@ -738,8 +837,8 @@
   }
 
   // ---------- 単語選択シート ----------
-  let wsSelection = null; // { ranges:[{start,end},...], presetGeneral, presetContextual, presetPos }
-  let wsPreview = null;   // { loading, error, general, contextual }
+  let wsSelection = null; // { ranges:[{start,end},...], presetGeneral, presetContextual, presetPos, presetPronunciation }
+  let wsPreview = null;   // { loading, error, general, contextual, pos, pronunciation }
   let wsPreviewToken = 0; // 非同期取得の競合(古い結果の上書き)を防ぐための連番
 
   function phraseTextFromRange(startIdx, endIdx) {
@@ -761,7 +860,8 @@
     if (!wsPreview || wsPreview.loading) {
       el.innerHTML = '<div class="ws-preview-loading">意味を辿っています…</div>';
       confirmBtn.disabled = true;
-    } else if (wsPreview.error) {
+    } else if (wsPreview.error || (!wsPreview.general && !wsPreview.contextual)) {
+      // 何らかの理由で意味が空のまま返ってきた場合も、失敗と同じ扱いにして再試行させる
       el.innerHTML = '<div class="ws-preview-error">取得に失敗しました（タップで再試行）</div>';
       el.querySelector('.ws-preview-error').addEventListener('click', refreshWordSheetPreview);
       confirmBtn.disabled = true;
@@ -771,6 +871,16 @@
         (wsPreview.contextual ? '<div class="ws-preview-block"><span class="ws-preview-label">この場面では</span><span class="ws-preview-contextual">' + wsPreview.contextual + '</span></div>' : '');
       confirmBtn.disabled = false;
     }
+    renderWsPos();
+  }
+
+  function renderWsPos() {
+    const parts = [];
+    const pron = (wsPreview && wsPreview.pronunciation) || wsSelection.presetPronunciation;
+    const pos = (wsPreview && wsPreview.pos) || wsSelection.presetPos;
+    if (pron) parts.push(pron);
+    if (pos) parts.push(pos);
+    document.getElementById('ws-pos').textContent = parts.join('　・　');
   }
 
   async function refreshWordSheetPreview() {
@@ -779,22 +889,28 @@
     const key = phraseKeyFromRanges(ranges);
     const myToken = ++wsPreviewToken;
 
+    // 空のキャッシュ/プリセット(何らかの理由で意味が空のまま保存されたもの)は
+    // 使えるデータとみなさず、必ずAIへ再取得しにいく
     const cached = getMeaningFromCache(current, key);
-    if (cached) {
-      wsPreview = { loading: false, error: false, general: cached.general || '', contextual: cached.contextual || '' };
+    if (cached && (cached.general || cached.contextual)) {
+      wsPreview = { loading: false, error: false, general: cached.general || '', contextual: cached.contextual || '', pos: cached.pos || '', pronunciation: cached.pronunciation || '' };
       renderWsPreview();
       return;
     }
     if (wsSelection.presetGeneral || wsSelection.presetContextual) {
-      wsPreview = { loading: false, error: false, general: wsSelection.presetGeneral || '', contextual: wsSelection.presetContextual || '' };
-      saveMeaningToCache(current, key, { general: wsPreview.general, contextual: wsPreview.contextual });
+      wsPreview = {
+        loading: false, error: false,
+        general: wsSelection.presetGeneral || '', contextual: wsSelection.presetContextual || '',
+        pos: wsSelection.presetPos || '', pronunciation: wsSelection.presetPronunciation || ''
+      };
+      saveMeaningToCache(current, key, { general: wsPreview.general, contextual: wsPreview.contextual, pos: wsPreview.pos, pronunciation: wsPreview.pronunciation });
       renderWsPreview();
       return;
     }
 
     const apiKey = getApiKey();
     if (!apiKey) {
-      wsPreview = { loading: false, error: false, general: '', contextual: 'APIキー未設定（右上の設定から入力してください）' };
+      wsPreview = { loading: false, error: false, general: '', contextual: 'APIキー未設定（右上の設定から入力してください）', pos: '', pronunciation: '' };
       renderWsPreview();
       return;
     }
@@ -805,13 +921,16 @@
     const word = phraseTextFromRanges(ranges);
     const paragraphEn = pagesEn[current];
     const paragraphJp = pagesJp[current];
-    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中の「' + word + '」という語句について、意味を2種類に分けて日本語で説明してください。' +
+    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中の「' + word + '」という語句について日本語で説明してください。' +
       'これが熟語・句動詞・慣用句・離れた位置にある構文である場合は、その旨も踏まえてください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
       '対象の語句: ' + word + '\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '{"meaningGeneral":"一般的な辞書のような、文脈に依存しない簡潔な訳語(15字以内)","meaningContextual":"この文中での使われ方を、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度)"}';
+      '{"partOfSpeech":"単語なら実際の品詞(名詞/動詞/形容詞など)、熟語等ならその種別(熟語/句動詞/慣用句/構文)",' +
+      '"pronunciation":"単語なら発音記号(IPA)。熟語等で馴染まなければ空文字",' +
+      '"meaningGeneral":"一般的な辞書のような、文脈に依存しない簡潔な訳語(15字以内)",' +
+      '"meaningContextual":"この文中での使われ方を、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度)"}';
 
     try {
       const raw = await callGemini(prompt);
@@ -819,10 +938,12 @@
       const parsed = JSON.parse(jsonStr);
       const general = (parsed.meaningGeneral || '').trim();
       const contextual = (parsed.meaningContextual || '').trim();
+      const pos = (parsed.partOfSpeech || '').trim();
+      const pronunciation = (parsed.pronunciation || '').trim();
       if (!general && !contextual) throw new Error('空の応答');
       if (myToken !== wsPreviewToken) return; // その間に選択範囲が変わっていたら結果は捨てる
-      wsPreview = { loading: false, error: false, general: general, contextual: contextual };
-      saveMeaningToCache(current, key, { general: general, contextual: contextual });
+      wsPreview = { loading: false, error: false, general: general, contextual: contextual, pos: pos, pronunciation: pronunciation };
+      saveMeaningToCache(current, key, { general: general, contextual: contextual, pos: pos, pronunciation: pronunciation });
     } catch (e) {
       console.warn('単語の意味取得に失敗:', e);
       if (myToken !== wsPreviewToken) return;
@@ -834,7 +955,6 @@
   function renderWordSheet() {
     const ranges = wsSelection.ranges;
     document.getElementById('ws-phrase').textContent = phraseTextFromRanges(ranges);
-    document.getElementById('ws-pos').textContent = wsSelection.presetPos ? '（AIが注目語句として提示: ' + wsSelection.presetPos + '）' : '';
     const isSingleRange = ranges.length === 1;
     document.getElementById('ws-extend-row').style.display = isSingleRange ? 'flex' : 'none';
     if (isSingleRange) {
@@ -848,16 +968,17 @@
     const groups = pageHighlightsByPage[current] || [];
     const indexMap = pageHighlightIndexByPage[current] || {};
     let ranges = [{ start: idx, end: idx }];
-    let presetGeneral = null, presetContextual = null, presetPos = null;
+    let presetGeneral = null, presetContextual = null, presetPos = null, presetPronunciation = null;
     // タップした位置がAIハイライト済みグループの範囲内なら、そのグループ全体(飛び飛びの場合も含む)を初期選択にする
     if (indexMap[idx] !== undefined) {
       const group = groups[indexMap[idx]];
       if (group) {
         ranges = group.ranges;
-        presetGeneral = group.general; presetContextual = group.contextual; presetPos = group.pos;
+        presetGeneral = group.general; presetContextual = group.contextual;
+        presetPos = group.pos; presetPronunciation = group.pronunciation;
       }
     }
-    wsSelection = { ranges: ranges, presetGeneral: presetGeneral, presetContextual: presetContextual, presetPos: presetPos };
+    wsSelection = { ranges: ranges, presetGeneral: presetGeneral, presetContextual: presetContextual, presetPos: presetPos, presetPronunciation: presetPronunciation };
     wsPreview = null;
     renderWordSheet();
     refreshWordSheetPreview();
@@ -872,14 +993,14 @@
   document.getElementById('ws-extend-prev').addEventListener('click', function() {
     if (!wsSelection || wsSelection.ranges.length !== 1 || wsSelection.ranges[0].start <= 0) return;
     wsSelection.ranges[0].start--;
-    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null; // 範囲が変わったので既知の意味は使わない
+    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null; wsSelection.presetPronunciation = null; // 範囲が変わったので既知の意味は使わない
     renderWordSheet();
     refreshWordSheetPreview();
   });
   document.getElementById('ws-extend-next').addEventListener('click', function() {
     if (!wsSelection || wsSelection.ranges.length !== 1 || wsSelection.ranges[0].end >= currentTokens.length - 1) return;
     wsSelection.ranges[0].end++;
-    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null;
+    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null; wsSelection.presetPronunciation = null;
     renderWordSheet();
     refreshWordSheetPreview();
   });
@@ -899,6 +1020,7 @@
     const note = {
       ranges: ranges, key: key, word: word,
       general: wsPreview.general || '', contextual: wsPreview.contextual || '',
+      pos: wsPreview.pos || '', pronunciation: wsPreview.pronunciation || '',
       loading: false, error: false, pageIndex: current
     };
     marginNotesByPage[current].push(note);
