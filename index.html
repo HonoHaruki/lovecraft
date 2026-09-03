@@ -306,6 +306,23 @@
   .word-sheet-box .modal-actions { justify-content: space-between; }
   .word-sheet-box .btn-save { flex: 1; margin-left: 10px; }
   .word-sheet-box .modal-actions button:first-child { flex: none; }
+  .word-sheet-box .btn-save:disabled { opacity: 0.4; }
+
+  .ws-preview {
+    text-align: left;
+    background: rgba(43,38,32,0.06);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    min-height: 20px;
+  }
+  .ws-preview-loading { color: #8a7a52; font-size: 0.85rem; font-style: italic; text-align: center; }
+  .ws-preview-error { color: #a05a4a; font-size: 0.85rem; font-style: italic; text-align: center; cursor: pointer; }
+  .ws-preview-block { margin-bottom: 8px; }
+  .ws-preview-block:last-child { margin-bottom: 0; }
+  .ws-preview-label { display: block; font-size: 0.7rem; color: #8a7a52; letter-spacing: 1px; margin-bottom: 2px; }
+  .ws-preview-general { font-size: 0.9rem; color: var(--ink); }
+  .ws-preview-contextual { font-size: 0.95rem; color: #5a4020; font-family: Georgia, serif; font-style: italic; }
 
   .margin-header .label {
     font-family: 'EB Garamond', Georgia, serif;
@@ -440,7 +457,8 @@
     <div class="modal-box word-sheet-box">
       <div class="ws-phrase" id="ws-phrase"></div>
       <div class="ws-pos" id="ws-pos"></div>
-      <div class="ws-extend-row">
+      <div class="ws-preview" id="ws-preview"></div>
+      <div class="ws-extend-row" id="ws-extend-row">
         <button id="ws-extend-prev">&#9664; 前の単語を追加</button>
         <button id="ws-extend-next">次の単語を追加 &#9654;</button>
       </div>
@@ -458,13 +476,30 @@
   let current = 0;
   let jpVisible = false;
   // ページごとの欄外メモ(単語タップ履歴)。ページを離れても保持し、戻ったら復元する
-  // 各メモは { startIdx, endIdx, key, word, meaning, loading, error } を持つ
-  const marginNotesByPage = {};
+  // 各メモは { ranges:[{start,end},...], key, word, general, contextual, loading, error } を持つ
+  let marginNotesByPage = {};
   // 現在のページのトークン配列(単語のspan要素と原文テキスト)
   let currentTokens = [];
   let currentSpans = [];
-  // AIが「学習価値あり」と判定したフレーズのページごとのマップ: { startIdx: {endIdx, meaning, pos} }
+  // AIが「学習価値あり」と判定したグループ(単語・熟語・飛び飛びの慣用句)のページごとの配列
+  // 各グループ: { ranges:[{start,end},...], general, contextual, pos }
   const pageHighlightsByPage = {};
+  // トークンindex -> そのページのhighlightGroups配列内でのindex、の逆引きマップ(ページごと)
+  const pageHighlightIndexByPage = {};
+
+  // ---------- 欄外メモの永続化 ----------
+  const STORAGE_KEY_NOTES = 'lovecraft_margin_notes';
+  function loadMarginNotesFromStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_NOTES) || '{}');
+      marginNotesByPage = saved || {};
+    } catch (e) {
+      marginNotesByPage = {};
+    }
+  }
+  function saveMarginNotesToStorage() {
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(marginNotesByPage));
+  }
 
   // ---------- APIキー管理 ----------
   function getApiKey() {
@@ -540,38 +575,66 @@
     return text.split(/\s+/).map(function(w) { return cleanWord(w).toLowerCase(); });
   }
 
-  // AIが返したフレーズ配列を、そのページのトークン列上の開始位置に紐付ける
-  function buildHighlightMap(pageIndex, phrases) {
+  // AIが返した語句(parts配列)を、そのページのトークン列上の位置に紐付ける
+  // parts が複数ある場合は、文中で離れた位置に出現する「飛び飛びの熟語・構文」として扱う
+  function buildHighlightGroups(pageIndex, items) {
     const tokens = tokenizeForMatch(pagesEn[pageIndex]);
-    const map = {};
-    (phrases || []).forEach(function(item) {
-      if (!item || !item.phrase) return;
-      const phraseTokens = tokenizeForMatch(item.phrase).filter(Boolean);
-      if (phraseTokens.length === 0) return;
-      for (let i = 0; i <= tokens.length - phraseTokens.length; i++) {
+    const groups = [];
+    const indexMap = {}; // tokenIndex -> groupIdx (先勝ち)
+
+    function findRange(partTokens, searchFrom) {
+      for (let i = searchFrom; i <= tokens.length - partTokens.length; i++) {
         let match = true;
-        for (let j = 0; j < phraseTokens.length; j++) {
-          if (tokens[i + j] !== phraseTokens[j]) { match = false; break; }
+        for (let j = 0; j < partTokens.length; j++) {
+          if (tokens[i + j] !== partTokens[j]) { match = false; break; }
         }
-        if (match && map[i] === undefined) {
-          map[i] = {
-            endIdx: i + phraseTokens.length - 1,
-            general: item.meaningGeneral || '',
-            contextual: item.meaningContextual || '',
-            pos: item.pos || ''
-          };
-          break;
-        }
+        if (match) return { start: i, end: i + partTokens.length - 1 };
       }
+      return null;
+    }
+
+    (items || []).forEach(function(item) {
+      if (!item || !item.parts || !item.parts.length) return;
+      const ranges = [];
+      let searchFrom = 0;
+      for (let p = 0; p < item.parts.length; p++) {
+        const partTokens = tokenizeForMatch(item.parts[p]).filter(Boolean);
+        if (partTokens.length === 0) continue;
+        const r = findRange(partTokens, searchFrom);
+        if (!r) { ranges.length = 0; break; } // どこかのパーツが本文に見つからなければ、AIの誤りとして無視
+        ranges.push(r);
+        searchFrom = r.end + 1;
+      }
+      if (ranges.length === 0) return;
+      // 既にどこかのトークンが別のグループに属していれば重複登録しない
+      const overlap = ranges.some(function(r) {
+        for (let i = r.start; i <= r.end; i++) { if (indexMap[i] !== undefined) return true; }
+        return false;
+      });
+      if (overlap) return;
+
+      const groupIdx = groups.length;
+      groups.push({
+        ranges: ranges,
+        general: item.meaningGeneral || '',
+        contextual: item.meaningContextual || '',
+        pos: item.pos || ''
+      });
+      ranges.forEach(function(r) {
+        for (let i = r.start; i <= r.end; i++) { indexMap[i] = groupIdx; }
+      });
     });
-    return map;
+
+    return { groups: groups, indexMap: indexMap };
   }
 
   async function ensureHighlightsForPage(pageIndex) {
     if (pageHighlightsByPage[pageIndex]) return; // 既に取得済み(メモリ上)
     const cache = loadPageHighlightCache();
     if (cache[pageIndex]) {
-      pageHighlightsByPage[pageIndex] = buildHighlightMap(pageIndex, cache[pageIndex]);
+      const built = buildHighlightGroups(pageIndex, cache[pageIndex]);
+      pageHighlightsByPage[pageIndex] = built.groups;
+      pageHighlightIndexByPage[pageIndex] = built.indexMap;
       if (pageIndex === current) applyHighlightsToDom();
       return;
     }
@@ -580,38 +643,45 @@
 
     const paragraphEn = pagesEn[pageIndex];
     const prompt = 'あなたは英語学習者向けの一節から、辞書で調べる価値がある語句を選ぶ役目です。' +
-      '以下の英文から、日本の高校〜大学レベルの学習者にとって知らない可能性が高い単語・熟語・句動詞・慣用句を、' +
-      '文章中に実際に登場する綴りのまま10個前後選んでください。基本的すぎる単語(the, is, and, have 等)は含めないでください。\n\n' +
+      '以下の英文から、日本の高校〜大学レベルの学習者にとって知らない可能性が高い単語・熟語・句動詞・慣用句・構文を、' +
+      '文章中に実際に登場する綴りのまま15〜20個ほど選んでください。基本的すぎる単語(the, is, and, have 等)は含めないでください。\n\n' +
+      '単語だけでなく、以下のようなタイプも積極的に拾ってください。\n' +
+      '・文中でひとまとまりの意味を持つ熟語・慣用句・句動詞(例: cast myself, no longer)\n' +
+      '・"not so much A as B" や "the 比較級 A, the 比較級 B" のように、Aの部分とBの部分が文中で離れた位置にある構文(飛び飛びの語句)。この場合はAとBそれぞれの原文表記を"parts"に順番通り2つ入れてください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '選んだ語句それぞれについて、意味を次の2種類に分けて書いてください。\n' +
       '・meaningGeneral: 一般的な辞書に載っているような、文脈に依存しない簡潔な訳語（15字以内、説明的な文章にしない）\n' +
       '・meaningContextual: この文章の中でその語句がどう使われているか、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度で)\n\n' +
       '出力は次のJSON配列の形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '[{"phrase":"原文での表記そのまま","pos":"単語/熟語/句動詞のいずれか","meaningGeneral":"...","meaningContextual":"..."}]';
+      '[{"parts":["原文での表記そのまま"],"pos":"単語/熟語/句動詞/構文のいずれか","meaningGeneral":"...","meaningContextual":"..."}]\n' +
+      '(飛び飛びの構文の場合はpartsに["Aの原文表記","Bの原文表記"]のように2つ入れてください)';
 
     try {
       const data = await callGemini(prompt);
       let jsonStr = data.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
-      const phrases = JSON.parse(jsonStr);
-      savePageHighlightCache(pageIndex, phrases);
-      pageHighlightsByPage[pageIndex] = buildHighlightMap(pageIndex, phrases);
+      const items = JSON.parse(jsonStr);
+      savePageHighlightCache(pageIndex, items);
+      const built = buildHighlightGroups(pageIndex, items);
+      pageHighlightsByPage[pageIndex] = built.groups;
+      pageHighlightIndexByPage[pageIndex] = built.indexMap;
       if (pageIndex === current) applyHighlightsToDom();
     } catch (e) {
       console.warn('ページのハイライト取得に失敗:', e);
-      // 失敗時は空配列として扱い、無限リトライしないようにする
-      pageHighlightsByPage[pageIndex] = {};
+      // 失敗時は空として扱い、無限リトライしないようにする
+      pageHighlightsByPage[pageIndex] = [];
+      pageHighlightIndexByPage[pageIndex] = {};
     }
   }
 
   function applyHighlightsToDom() {
-    const map = pageHighlightsByPage[current] || {};
+    const groups = pageHighlightsByPage[current] || [];
     currentSpans.forEach(function(span) { span.classList.remove('highlighted'); });
-    Object.keys(map).forEach(function(startIdxStr) {
-      const startIdx = parseInt(startIdxStr, 10);
-      const endIdx = map[startIdxStr].endIdx;
-      for (let i = startIdx; i <= endIdx && i < currentSpans.length; i++) {
-        currentSpans[i].classList.add('highlighted');
-      }
+    groups.forEach(function(group) {
+      group.ranges.forEach(function(r) {
+        for (let i = r.start; i <= r.end && i < currentSpans.length; i++) {
+          currentSpans[i].classList.add('highlighted');
+        }
+      });
     });
   }
 
@@ -645,23 +715,11 @@
     }
     notes.forEach(function(note) {
       const div = document.createElement('div');
-      div.className = 'margin-note' + (note.error ? ' error' : '');
+      div.className = 'margin-note';
       div.style.setProperty('--tilt', (Math.random() * 1.6 - 0.8) + 'deg');
-      if (note.loading) {
-        div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-block mn-loading">意味を辿っている…</span>';
-      } else if (note.error) {
-        div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-block mn-error-text">' + note.errorText + '</span>';
-        div.querySelector('.mn-error-text').addEventListener('click', function() {
-          fetchWordMeaning(note);
-        });
-      } else if (note.contextual || note.general) {
-        div.innerHTML = '<span class="mn-word">' + note.word + '</span>' +
-          (note.general ? '<span class="mn-block"><span class="mn-label">辞書的には</span><span class="mn-general">' + note.general + '</span></span>' : '') +
-          (note.contextual ? '<span class="mn-block"><span class="mn-label">この場面では</span><span class="mn-contextual">' + note.contextual + '</span></span>' : '');
-      } else {
-        // APIキー未設定など単発メッセージのみのケース
-        div.innerHTML = '<span class="mn-word">' + note.word + '</span><span class="mn-block mn-loading">' + (note.plainMessage || '') + '</span>';
-      }
+      div.innerHTML = '<span class="mn-word">' + note.word + '</span>' +
+        (note.general ? '<span class="mn-block"><span class="mn-label">辞書的には</span><span class="mn-general">' + note.general + '</span></span>' : '') +
+        (note.contextual ? '<span class="mn-block"><span class="mn-label">この場面では</span><span class="mn-contextual">' + note.contextual + '</span></span>' : '');
       listEl.appendChild(div);
     });
     listEl.scrollTop = listEl.scrollHeight;
@@ -671,14 +729,18 @@
     const notes = marginNotesByPage[current] || [];
     currentSpans.forEach(function(span) { span.classList.remove('tapped'); });
     notes.forEach(function(note) {
-      for (let i = note.startIdx; i <= note.endIdx && i < currentSpans.length; i++) {
-        currentSpans[i].classList.add('tapped');
-      }
+      (note.ranges || []).forEach(function(r) {
+        for (let i = r.start; i <= r.end && i < currentSpans.length; i++) {
+          currentSpans[i].classList.add('tapped');
+        }
+      });
     });
   }
 
   // ---------- 単語選択シート ----------
-  let wsSelection = null; // { startIdx, endIdx, presetMeaning, presetPos }
+  let wsSelection = null; // { ranges:[{start,end},...], presetGeneral, presetContextual, presetPos }
+  let wsPreview = null;   // { loading, error, general, contextual }
+  let wsPreviewToken = 0; // 非同期取得の競合(古い結果の上書き)を防ぐための連番
 
   function phraseTextFromRange(startIdx, endIdx) {
     return currentTokens.slice(startIdx, endIdx + 1).join(' ').replace(/^[.,!?;:"'\u2018\u2019\u201c\u201d()]+|[.,!?;:"'\u2018\u2019\u201c\u201d()]+$/g, '');
@@ -686,113 +748,68 @@
   function phraseKeyFromRange(startIdx, endIdx) {
     return currentTokens.slice(startIdx, endIdx + 1).map(function(w) { return cleanWord(w).toLowerCase(); }).join(' ');
   }
-
-  function renderWordSheet() {
-    const text = phraseTextFromRange(wsSelection.startIdx, wsSelection.endIdx);
-    document.getElementById('ws-phrase').textContent = text;
-    document.getElementById('ws-pos').textContent = wsSelection.presetPos ? '（AIが注目語として提示: ' + wsSelection.presetPos + '）' : '';
-    document.getElementById('ws-extend-prev').disabled = wsSelection.startIdx <= 0;
-    document.getElementById('ws-extend-next').disabled = wsSelection.endIdx >= currentTokens.length - 1;
+  function phraseTextFromRanges(ranges) {
+    return ranges.map(function(r) { return phraseTextFromRange(r.start, r.end); }).join(' … ');
+  }
+  function phraseKeyFromRanges(ranges) {
+    return ranges.map(function(r) { return phraseKeyFromRange(r.start, r.end); }).join(' ... ');
   }
 
-  function openWordSheet(idx) {
-    const map = pageHighlightsByPage[current] || {};
-    let startIdx = idx, endIdx = idx, presetGeneral = null, presetContextual = null, presetPos = null;
-    // タップした位置がAIハイライト済みフレーズの範囲内なら、そのフレーズ全体を初期選択にする
-    Object.keys(map).forEach(function(s) {
-      const sIdx = parseInt(s, 10);
-      const info = map[s];
-      if (idx >= sIdx && idx <= info.endIdx) {
-        startIdx = sIdx; endIdx = info.endIdx;
-        presetGeneral = info.general; presetContextual = info.contextual; presetPos = info.pos;
-      }
-    });
-    wsSelection = { startIdx: startIdx, endIdx: endIdx, presetGeneral: presetGeneral, presetContextual: presetContextual, presetPos: presetPos };
-    renderWordSheet();
-    document.getElementById('word-sheet-modal').classList.add('show');
-  }
-  function closeWordSheet() {
-    document.getElementById('word-sheet-modal').classList.remove('show');
-    wsSelection = null;
-  }
-
-  document.getElementById('ws-extend-prev').addEventListener('click', function() {
-    if (!wsSelection || wsSelection.startIdx <= 0) return;
-    wsSelection.startIdx--;
-    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null; // 範囲が変わったので既知の意味は使わない
-    renderWordSheet();
-  });
-  document.getElementById('ws-extend-next').addEventListener('click', function() {
-    if (!wsSelection || wsSelection.endIdx >= currentTokens.length - 1) return;
-    wsSelection.endIdx++;
-    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null;
-    renderWordSheet();
-  });
-  document.getElementById('ws-cancel').addEventListener('click', closeWordSheet);
-  document.getElementById('word-sheet-modal').addEventListener('click', function(e) {
-    if (e.target === document.getElementById('word-sheet-modal')) closeWordSheet();
-  });
-  document.getElementById('ws-confirm').addEventListener('click', function() {
-    if (!wsSelection) return;
-    const startIdx = wsSelection.startIdx, endIdx = wsSelection.endIdx;
-    const presetGeneral = wsSelection.presetGeneral;
-    const presetContextual = wsSelection.presetContextual;
-    const key = phraseKeyFromRange(startIdx, endIdx);
-    const word = phraseTextFromRange(startIdx, endIdx);
-    if (!marginNotesByPage[current]) marginNotesByPage[current] = [];
-    // 同じ範囲(または同じ語句)が既に登録済みなら重複追加しない
-    if (marginNotesByPage[current].some(function(n) { return n.key === key; })) { closeWordSheet(); return; }
-
-    const note = { startIdx: startIdx, endIdx: endIdx, key: key, word: word, general: '', contextual: '', loading: true, error: false, pageIndex: current };
-    marginNotesByPage[current].push(note);
-    closeWordSheet();
-    markTappedWordsOnPage();
-    renderMarginList();
-
-    if (presetGeneral || presetContextual) {
-      // AIが既にこの文脈での意味を提示済みなら、追加のAPI呼び出しをせず即反映
-      note.loading = false;
-      note.general = presetGeneral || '';
-      note.contextual = presetContextual || '';
-      saveMeaningToCache(current, key, { general: note.general, contextual: note.contextual });
-      renderMarginList();
+  function renderWsPreview() {
+    const el = document.getElementById('ws-preview');
+    const confirmBtn = document.getElementById('ws-confirm');
+    if (!wsPreview || wsPreview.loading) {
+      el.innerHTML = '<div class="ws-preview-loading">意味を辿っています…</div>';
+      confirmBtn.disabled = true;
+    } else if (wsPreview.error) {
+      el.innerHTML = '<div class="ws-preview-error">取得に失敗しました（タップで再試行）</div>';
+      el.querySelector('.ws-preview-error').addEventListener('click', refreshWordSheetPreview);
+      confirmBtn.disabled = true;
     } else {
-      fetchWordMeaning(note);
+      el.innerHTML =
+        (wsPreview.general ? '<div class="ws-preview-block"><span class="ws-preview-label">辞書的には</span><span class="ws-preview-general">' + wsPreview.general + '</span></div>' : '') +
+        (wsPreview.contextual ? '<div class="ws-preview-block"><span class="ws-preview-label">この場面では</span><span class="ws-preview-contextual">' + wsPreview.contextual + '</span></div>' : '');
+      confirmBtn.disabled = false;
     }
-  });
+  }
 
-  async function fetchWordMeaning(note) {
-    const pageIndex = note.pageIndex;
-    const cached = getMeaningFromCache(pageIndex, note.key);
+  async function refreshWordSheetPreview() {
+    if (!wsSelection) return;
+    const ranges = wsSelection.ranges;
+    const key = phraseKeyFromRanges(ranges);
+    const myToken = ++wsPreviewToken;
+
+    const cached = getMeaningFromCache(current, key);
     if (cached) {
-      note.loading = false;
-      note.error = false;
-      note.general = cached.general || '';
-      note.contextual = cached.contextual || '';
-      renderMarginList();
+      wsPreview = { loading: false, error: false, general: cached.general || '', contextual: cached.contextual || '' };
+      renderWsPreview();
+      return;
+    }
+    if (wsSelection.presetGeneral || wsSelection.presetContextual) {
+      wsPreview = { loading: false, error: false, general: wsSelection.presetGeneral || '', contextual: wsSelection.presetContextual || '' };
+      saveMeaningToCache(current, key, { general: wsPreview.general, contextual: wsPreview.contextual });
+      renderWsPreview();
       return;
     }
 
     const apiKey = getApiKey();
     if (!apiKey) {
-      note.loading = false;
-      note.error = false;
-      note.plainMessage = 'APIキー未設定（右上の設定から入力してください）';
-      renderMarginList();
+      wsPreview = { loading: false, error: false, general: '', contextual: 'APIキー未設定（右上の設定から入力してください）' };
+      renderWsPreview();
       return;
     }
 
-    note.loading = true;
-    note.error = false;
-    renderMarginList();
+    wsPreview = { loading: true, error: false };
+    renderWsPreview();
 
-    const paragraphEn = pagesEn[pageIndex];
-    const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中の「' + note.word + '」という語句について、意味を2種類に分けて日本語で説明してください。' +
-      'これが熟語・句動詞・慣用句である場合はその旨も踏まえてください。\n\n' +
+    const word = phraseTextFromRanges(ranges);
+    const paragraphEn = pagesEn[current];
+    const paragraphJp = pagesJp[current];
+    const prompt = 'あなたは英語小説を読む学習者を助ける辞書です。以下の英文の一節の中の「' + word + '」という語句について、意味を2種類に分けて日本語で説明してください。' +
+      'これが熟語・句動詞・慣用句・離れた位置にある構文である場合は、その旨も踏まえてください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
-      '対象の語句: ' + note.word + '\n\n' +
+      '対象の語句: ' + word + '\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
       '{"meaningGeneral":"一般的な辞書のような、文脈に依存しない簡潔な訳語(15字以内)","meaningContextual":"この文中での使われ方を、雰囲気や感情のニュアンスも込めて生き生きと(25〜45字程度)"}';
 
@@ -803,19 +820,93 @@
       const general = (parsed.meaningGeneral || '').trim();
       const contextual = (parsed.meaningContextual || '').trim();
       if (!general && !contextual) throw new Error('空の応答');
-      note.general = general;
-      note.contextual = contextual;
-      note.loading = false;
-      note.error = false;
-      saveMeaningToCache(pageIndex, note.key, { general: general, contextual: contextual });
+      if (myToken !== wsPreviewToken) return; // その間に選択範囲が変わっていたら結果は捨てる
+      wsPreview = { loading: false, error: false, general: general, contextual: contextual };
+      saveMeaningToCache(current, key, { general: general, contextual: contextual });
     } catch (e) {
       console.warn('単語の意味取得に失敗:', e);
-      note.loading = false;
-      note.error = true;
-      note.errorText = '取得に失敗しました（タップで再試行）';
+      if (myToken !== wsPreviewToken) return;
+      wsPreview = { loading: false, error: true };
     }
-    renderMarginList();
+    renderWsPreview();
   }
+
+  function renderWordSheet() {
+    const ranges = wsSelection.ranges;
+    document.getElementById('ws-phrase').textContent = phraseTextFromRanges(ranges);
+    document.getElementById('ws-pos').textContent = wsSelection.presetPos ? '（AIが注目語句として提示: ' + wsSelection.presetPos + '）' : '';
+    const isSingleRange = ranges.length === 1;
+    document.getElementById('ws-extend-row').style.display = isSingleRange ? 'flex' : 'none';
+    if (isSingleRange) {
+      document.getElementById('ws-extend-prev').disabled = ranges[0].start <= 0;
+      document.getElementById('ws-extend-next').disabled = ranges[0].end >= currentTokens.length - 1;
+    }
+    renderWsPreview();
+  }
+
+  function openWordSheet(idx) {
+    const groups = pageHighlightsByPage[current] || [];
+    const indexMap = pageHighlightIndexByPage[current] || {};
+    let ranges = [{ start: idx, end: idx }];
+    let presetGeneral = null, presetContextual = null, presetPos = null;
+    // タップした位置がAIハイライト済みグループの範囲内なら、そのグループ全体(飛び飛びの場合も含む)を初期選択にする
+    if (indexMap[idx] !== undefined) {
+      const group = groups[indexMap[idx]];
+      if (group) {
+        ranges = group.ranges;
+        presetGeneral = group.general; presetContextual = group.contextual; presetPos = group.pos;
+      }
+    }
+    wsSelection = { ranges: ranges, presetGeneral: presetGeneral, presetContextual: presetContextual, presetPos: presetPos };
+    wsPreview = null;
+    renderWordSheet();
+    refreshWordSheetPreview();
+    document.getElementById('word-sheet-modal').classList.add('show');
+  }
+  function closeWordSheet() {
+    document.getElementById('word-sheet-modal').classList.remove('show');
+    wsSelection = null;
+    wsPreview = null;
+  }
+
+  document.getElementById('ws-extend-prev').addEventListener('click', function() {
+    if (!wsSelection || wsSelection.ranges.length !== 1 || wsSelection.ranges[0].start <= 0) return;
+    wsSelection.ranges[0].start--;
+    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null; // 範囲が変わったので既知の意味は使わない
+    renderWordSheet();
+    refreshWordSheetPreview();
+  });
+  document.getElementById('ws-extend-next').addEventListener('click', function() {
+    if (!wsSelection || wsSelection.ranges.length !== 1 || wsSelection.ranges[0].end >= currentTokens.length - 1) return;
+    wsSelection.ranges[0].end++;
+    wsSelection.presetGeneral = null; wsSelection.presetContextual = null; wsSelection.presetPos = null;
+    renderWordSheet();
+    refreshWordSheetPreview();
+  });
+  document.getElementById('ws-cancel').addEventListener('click', closeWordSheet);
+  document.getElementById('word-sheet-modal').addEventListener('click', function(e) {
+    if (e.target === document.getElementById('word-sheet-modal')) closeWordSheet();
+  });
+  document.getElementById('ws-confirm').addEventListener('click', function() {
+    if (!wsSelection || !wsPreview || wsPreview.loading || wsPreview.error) return;
+    const ranges = wsSelection.ranges;
+    const key = phraseKeyFromRanges(ranges);
+    const word = phraseTextFromRanges(ranges);
+    if (!marginNotesByPage[current]) marginNotesByPage[current] = [];
+    // 同じ語句が既に登録済みなら重複追加しない
+    if (marginNotesByPage[current].some(function(n) { return n.key === key; })) { closeWordSheet(); return; }
+
+    const note = {
+      ranges: ranges, key: key, word: word,
+      general: wsPreview.general || '', contextual: wsPreview.contextual || '',
+      loading: false, error: false, pageIndex: current
+    };
+    marginNotesByPage[current].push(note);
+    saveMarginNotesToStorage();
+    closeWordSheet();
+    markTappedWordsOnPage();
+    renderMarginList();
+  });
 
   function render() {
     renderPageText(pagesEn[current]);
@@ -890,6 +981,7 @@
   window.addEventListener('orientationchange', checkOrientation);
   checkOrientation();
 
+  loadMarginNotesFromStorage();
   render();
 </script>
 </body>
