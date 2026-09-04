@@ -169,13 +169,13 @@
   }
 
   /* ---------- 日本語訳: 本文カラムだけに重なるボトムシート ---------- */
-  /* max-height の割合計算はブラウザ差で崩れやすいため、top/bottomを直接固定して
-     高さを確定させ、内部を独立してスクロールさせる構成にしている */
+  /* 高さは常に固定(中身の長さでは変わらない)。中身が長ければ#jp-textの中だけがスクロールする。
+     高さの実際の値(半分/全画面)はJS側で実測してheightに直接設定する(dvhや%指定はブラウザ差で崩れるため) */
   .jp-sheet {
     position: absolute;
     left: 0; right: 0;
-    top: 70px;
     bottom: var(--footer-h, 64px);
+    height: 300px;
     background: #17190f;
     color: #b9b39c;
     border-top: 1px solid #3a3527;
@@ -185,14 +185,29 @@
     font-size: 0.92rem;
     line-height: 1.85;
     transform: translateY(105%);
-    transition: transform 0.25s ease;
+    transition: transform 0.25s ease, height 0.25s ease;
     box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
     z-index: 5;
   }
   .jp-sheet.show { transform: translateY(0); }
+  .jp-drag-handle {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0 6px;
+    cursor: grab;
+    touch-action: none;
+  }
+  .jp-drag-handle span {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    background: #4a4530;
+  }
   .jp-sheet .jp-label {
     flex: none;
-    padding: 20px 24px 10px;
+    padding: 0 24px 10px;
     font-size: 0.68rem;
     color: var(--accent);
     letter-spacing: 2px;
@@ -441,6 +456,7 @@
       </div>
 
       <div class="jp-sheet" id="jp-sheet">
+        <div class="jp-drag-handle" id="jp-drag-handle"><span></span></div>
         <div class="jp-label">フレーバーテキスト (日本語訳)</div>
         <div id="jp-text"></div>
       </div>
@@ -1033,25 +1049,98 @@
   document.getElementById('btn-next').addEventListener('click', function() {
     if (current < pagesEn.length - 1) { current++; render(); }
   });
+
+  // ---------- 日本語訳シートの開閉・高さ(半分/全画面)の管理 ----------
+  let jpHeightHalf = 300;
+  let jpHeightFull = 500;
+  let jpState = 'half'; // 'half' | 'full'
+  const jpSheetEl = document.getElementById('jp-sheet');
+
+  function openJpSheet() {
+    jpVisible = true;
+    jpState = 'half';
+    jpSheetEl.style.transition = 'none';
+    jpSheetEl.style.height = jpHeightHalf + 'px';
+    // transformのtransitionだけ効かせるため、高さ確定後に戻す
+    void jpSheetEl.offsetHeight;
+    jpSheetEl.style.transition = 'transform 0.25s ease, height 0.25s ease';
+    jpSheetEl.classList.add('show');
+  }
+  function closeJpSheet() {
+    jpVisible = false;
+    jpSheetEl.classList.remove('show');
+  }
   document.getElementById('btn-toggle-jp').addEventListener('click', function(e) {
     e.stopPropagation();
-    jpVisible = !jpVisible;
-    document.getElementById('jp-sheet').classList.toggle('show', jpVisible);
+    if (jpVisible) { closeJpSheet(); } else { openJpSheet(); }
   });
   // シート外(本文エリアなど)をタップしたら閉じる
   document.addEventListener('click', function(e) {
     if (!jpVisible) return;
-    const sheet = document.getElementById('jp-sheet');
-    if (sheet.contains(e.target)) return;
-    jpVisible = false;
-    sheet.classList.remove('show');
+    if (jpSheetEl.contains(e.target)) return;
+    closeJpSheet();
   });
+
+  // ---------- ドラッグハンドル: 上に引くと全画面、下に引くと半分/閉じる ----------
+  (function() {
+    const handle = document.getElementById('jp-drag-handle');
+    let dragging = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    handle.addEventListener('pointerdown', function(e) {
+      dragging = true;
+      startY = e.clientY;
+      startHeight = jpSheetEl.getBoundingClientRect().height;
+      jpSheetEl.style.transition = 'none';
+      handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', function(e) {
+      if (!dragging) return;
+      const delta = startY - e.clientY; // 上にドラッグ = 正の値
+      let h = startHeight + delta;
+      h = Math.min(jpHeightFull, Math.max(60, h));
+      jpSheetEl.style.height = h + 'px';
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      jpSheetEl.style.transition = 'transform 0.25s ease, height 0.25s ease';
+      const h = jpSheetEl.getBoundingClientRect().height;
+      const midPoint = (jpHeightHalf + jpHeightFull) / 2;
+      if (h < jpHeightHalf * 0.55) {
+        // 大きく下に引いたら閉じる
+        jpSheetEl.style.height = jpHeightHalf + 'px';
+        closeJpSheet();
+        jpState = 'half';
+      } else if (h > midPoint) {
+        jpState = 'full';
+        jpSheetEl.style.height = jpHeightFull + 'px';
+      } else {
+        jpState = 'half';
+        jpSheetEl.style.height = jpHeightHalf + 'px';
+      }
+    }
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+  })();
 
   // ---------- 操作バーの高さをCSS変数に反映(日本語訳シートがバーと重ならないようにする) ----------
   function syncFooterHeight() {
     const footer = document.querySelector('.book-footer');
+    const bookCol = document.querySelector('.book-col');
     if (footer) {
       document.documentElement.style.setProperty('--footer-h', footer.offsetHeight + 'px');
+    }
+    // 日本語訳シートの「半分」「全画面」それぞれの高さを実測して更新する
+    if (footer && bookCol) {
+      const available = bookCol.clientHeight - footer.offsetHeight;
+      jpHeightFull = Math.max(200, available - 50); // 上部が少し見える余白を残す
+      jpHeightHalf = Math.max(160, Math.round(available * 0.5));
+      // 開いている最中にリサイズされた場合、現在の状態に合わせて高さを再適用
+      if (jpVisible) {
+        jpSheetEl.style.height = (jpState === 'full' ? jpHeightFull : jpHeightHalf) + 'px';
+      }
     }
   }
   window.addEventListener('resize', syncFooterHeight);
