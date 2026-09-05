@@ -59,6 +59,7 @@
     border-right: 1px solid #221f16;
   }
   .book-header {
+    position: relative;
     padding: calc(env(safe-area-inset-top) + 14px) 20px 8px;
     text-align: center;
     flex: none;
@@ -72,6 +73,22 @@
     margin: 0;
   }
   .book-header .subtitle { font-size: 0.65rem; color: #6b6656; letter-spacing: 2px; margin-top: 2px; }
+  .font-size-controls {
+    position: absolute;
+    right: 16px;
+    top: calc(env(safe-area-inset-top) + 14px);
+    display: flex;
+    gap: 6px;
+  }
+  .font-size-controls button {
+    width: 30px; height: 26px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #8a8370;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
 
   .page-scroll {
     flex: 1;
@@ -84,10 +101,12 @@
   .page {
     position: absolute;
     left: 25%; right: 25%;
-    top: 28%; bottom: 28%;
+    top: 28%;
+    max-height: 44%; /* JS側で羊皮紙の安全域の高さに合わせて実測値を上書きする */
+    height: auto;
     color: var(--ink);
     font-family: 'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-    font-size: 1.05rem;
+    font-size: var(--page-font-size, 1.05rem);
     letter-spacing: 0.2px;
     line-height: 1.75;
     overflow-y: auto;
@@ -203,6 +222,35 @@
     -webkit-overflow-scrolling: touch;
     padding: 0 24px 22px;
   }
+  .jp-commentary-toggle {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px dashed #3a3527;
+    color: var(--accent);
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    cursor: pointer;
+  }
+  .jp-commentary-body {
+    margin-top: 10px;
+    font-size: 0.88rem;
+    line-height: 1.8;
+  }
+  .jp-commentary-body .jc-label {
+    display: block;
+    font-size: 0.68rem;
+    color: #8a7a52;
+    letter-spacing: 2px;
+    margin: 12px 0 4px;
+  }
+  .jp-commentary-body .jc-label:first-child { margin-top: 0; }
+  .jp-commentary-body .jc-loading,
+  .jp-commentary-body .jc-error {
+    font-style: italic;
+    color: #8a7a52;
+    font-size: 0.85rem;
+  }
+  .jp-commentary-body .jc-error { color: #a05a4a; cursor: pointer; }
 
   /* ---------- 右：欄外メモ(単語帳) ---------- */
   .margin-col {
@@ -433,6 +481,10 @@
       <div class="book-header">
         <h1>D A G O N</h1>
         <div class="subtitle">H. P. LOVECRAFT</div>
+        <div class="font-size-controls" id="font-size-controls">
+          <button id="btn-font-minus" aria-label="文字を小さく">A-</button>
+          <button id="btn-font-plus" aria-label="文字を大きく">A+</button>
+        </div>
       </div>
 
       <div class="page-scroll">
@@ -442,7 +494,11 @@
       <div class="jp-sheet" id="jp-sheet">
         <div class="jp-drag-handle" id="jp-drag-handle"><span></span></div>
         <div class="jp-label">フレーバーテキスト (日本語訳)</div>
-        <div id="jp-text"></div>
+        <div id="jp-text">
+          <div id="jp-translation-text"></div>
+          <div class="jp-commentary-toggle" id="jp-commentary-toggle">▼ 解説を見る</div>
+          <div class="jp-commentary-body" id="jp-commentary-body" style="display:none;"></div>
+        </div>
       </div>
 
       <div class="book-footer">
@@ -545,14 +601,26 @@
   const GEMINI_MODEL = 'gemini-3.7-flash';
   async function callGemini(promptText) {
     const apiKey = getApiKey();
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-    });
+    const controller = new AbortController();
+    // 通信が固まったまま戻ってこない事態を避けるため、20秒でタイムアウトさせる
+    const timeoutId = setTimeout(function() { controller.abort(); }, 20000);
+    let res;
+    try {
+      res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }),
+        signal: controller.signal
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('タイムアウト(20秒)');
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
     if (!res.ok) {
       const errBody = await res.text().catch(function() { return ''; });
       console.warn('Gemini APIエラー本文:', errBody);
@@ -595,6 +663,102 @@
     cache[pageIndex] = phrases;
     localStorage.setItem('lovecraft_page_highlights_v2', JSON.stringify(cache));
   }
+
+  // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
+  function loadCommentaryCache() {
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v1') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveCommentaryToCache(pageIndex, obj) {
+    const cache = loadCommentaryCache();
+    cache[pageIndex] = obj;
+    localStorage.setItem('lovecraft_commentary_v1', JSON.stringify(cache));
+  }
+  function getCommentaryFromCache(pageIndex) {
+    const cache = loadCommentaryCache();
+    return cache[pageIndex];
+  }
+
+  function resetCommentaryUI() {
+    const toggle = document.getElementById('jp-commentary-toggle');
+    const body = document.getElementById('jp-commentary-body');
+    body.style.display = 'none';
+    body.innerHTML = '';
+    toggle.textContent = '▼ 解説を見る';
+  }
+
+  function renderCommentaryState(state) {
+    const body = document.getElementById('jp-commentary-body');
+    if (!state || state.loading) {
+      body.innerHTML = '<div class="jc-loading">解説を読み込んでいます…</div>';
+    } else if (state.error) {
+      body.innerHTML = '<div class="jc-error">取得に失敗しました（タップで再試行）</div>';
+      body.querySelector('.jc-error').addEventListener('click', function(e) {
+        e.stopPropagation();
+        fetchCommentaryForCurrentPage(true);
+      });
+    } else {
+      body.innerHTML =
+        '<span class="jc-label">文法・構文</span>' + (state.grammar || '') +
+        '<span class="jc-label">内容・文脈</span>' + (state.context || '');
+    }
+  }
+
+  async function fetchCommentaryForCurrentPage(forceRefetch) {
+    const pageIndex = current;
+    if (!forceRefetch) {
+      const cached = getCommentaryFromCache(pageIndex);
+      if (cached && (cached.grammar || cached.context)) {
+        renderCommentaryState(cached);
+        return;
+      }
+    }
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      renderCommentaryState({ error: false, grammar: 'APIキー未設定（右上の設定から入力してください）', context: '' });
+      return;
+    }
+    renderCommentaryState({ loading: true });
+
+    const paragraphEn = pagesEn[pageIndex];
+    const paragraphJp = pagesJp[pageIndex];
+    const prompt = 'あなたは英文読解を助ける先生です。以下の英文の一節について解説してください。\n\n' +
+      '英文: ' + paragraphEn + '\n\n' +
+      '参考(日本語訳): ' + paragraphJp + '\n\n' +
+      '次の2種類の解説を、それぞれ日本語で150〜250字程度で書いてください。\n' +
+      '・grammar: 文法・構文の面で特に構造が複雑だったり読み違えやすい部分を、文の作りを分解しながら分かりやすく説明する\n' +
+      '・context: この場面で何が起きているか、心情や背景も含めた内容・文脈の解説\n\n' +
+      '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
+      '{"grammar":"...","context":"..."}';
+
+    try {
+      const raw = await callGemini(prompt);
+      const jsonStr = raw.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(jsonStr);
+      const grammar = (parsed.grammar || '').trim();
+      const context = (parsed.context || '').trim();
+      if (!grammar && !context) throw new Error('空の応答');
+      const result = { loading: false, error: false, grammar: grammar, context: context };
+      saveCommentaryToCache(pageIndex, result);
+      if (pageIndex === current) renderCommentaryState(result);
+    } catch (e) {
+      console.warn('解説の取得に失敗:', e);
+      if (pageIndex === current) renderCommentaryState({ loading: false, error: true });
+    }
+  }
+
+  document.getElementById('jp-commentary-toggle').addEventListener('click', function() {
+    const body = document.getElementById('jp-commentary-body');
+    const isOpen = body.style.display !== 'none';
+    if (isOpen) {
+      body.style.display = 'none';
+      this.textContent = '▼ 解説を見る';
+      return;
+    }
+    body.style.display = 'block';
+    this.textContent = '▲ 解説を閉じる';
+    if (!body.innerHTML) fetchCommentaryForCurrentPage(false);
+  });
 
   // 該当ページの本文からトークン列(小文字・記号除去)を作る
   function tokenizeForMatch(text) {
@@ -1004,7 +1168,9 @@
     const note = {
       ranges: ranges, key: key, word: word,
       general: wsPreview.general || '', contextual: wsPreview.contextual || '',
-      pos: wsPreview.pos || '', pronunciation: wsPreview.pronunciation || '',
+      // 意味の再取得結果に品詞・発音記号が無い場合は、AIが事前に提示していた情報にフォールバックする
+      pos: wsPreview.pos || wsSelection.presetPos || '',
+      pronunciation: wsPreview.pronunciation || wsSelection.presetPronunciation || '',
       loading: false, error: false, pageIndex: current
     };
     marginNotesByPage[current].push(note);
@@ -1016,7 +1182,8 @@
 
   function render() {
     renderPageText(pagesEn[current]);
-    document.getElementById('jp-text').textContent = pagesJp[current];
+    document.getElementById('jp-translation-text').textContent = pagesJp[current];
+    resetCommentaryUI();
     document.getElementById('page-num').textContent = (current + 1) + " / " + pagesEn.length;
     document.getElementById('btn-prev').disabled = current === 0;
     document.getElementById('btn-next').disabled = current === pagesEn.length - 1;
@@ -1146,14 +1313,35 @@
     const scale = Math.max(cw / SCROLL_IMG_W, ch / SCROLL_IMG_H);
     const dispW = SCROLL_IMG_W * scale, dispH = SCROLL_IMG_H * scale;
     const offX = (cw - dispW) / 2, offY = (ch - dispH) / 2;
+    const safeTopPx = offY + SCROLL_SAFE.top * dispH;
+    const safeBottomPx = offY + SCROLL_SAFE.bottom * dispH;
     pageEl.style.left = (offX + SCROLL_SAFE.left * dispW) + 'px';
     pageEl.style.right = (cw - (offX + SCROLL_SAFE.right * dispW)) + 'px';
-    pageEl.style.top = (offY + SCROLL_SAFE.top * dispH) + 'px';
-    pageEl.style.bottom = (ch - (offY + SCROLL_SAFE.bottom * dispH)) + 'px';
+    pageEl.style.top = safeTopPx + 'px';
+    // 高さは中身に応じて伸び縮みさせ、羊皮紙の安全域を超えたらそこでスクロールに切り替える
+    pageEl.style.bottom = '';
+    pageEl.style.maxHeight = Math.max(60, safeBottomPx - safeTopPx) + 'px';
   }
   window.addEventListener('resize', positionPageOverlay);
   window.addEventListener('orientationchange', positionPageOverlay);
   positionPageOverlay();
+
+  // 画面ロック解除やアプリ切り替えから戻った時は resize が発火しないことがあるため、
+  // 可視状態に戻ったタイミングでも配置とシート高さを再計算する
+  function resyncLayoutAfterReturn() {
+    if (document.visibilityState !== 'visible') return;
+    positionPageOverlay();
+    syncFooterHeight();
+    // 戻った直後はブラウザのUI(アドレスバー等)がまだ確定していないことがあるため、
+    // 少し待ってからもう一度実施する
+    setTimeout(function() {
+      positionPageOverlay();
+      syncFooterHeight();
+    }, 300);
+  }
+  document.addEventListener('visibilitychange', resyncLayoutAfterReturn);
+  window.addEventListener('pageshow', resyncLayoutAfterReturn);
+  window.addEventListener('focus', resyncLayoutAfterReturn);
 
   // ---------- 設定モーダル ----------
   const settingsModal = document.getElementById('settings-modal');
@@ -1183,6 +1371,23 @@
   window.addEventListener('resize', checkOrientation);
   window.addEventListener('orientationchange', checkOrientation);
   checkOrientation();
+
+  // ---------- 文字サイズ調整 ----------
+  const FONT_SIZE_MIN = 0.8, FONT_SIZE_MAX = 1.5, FONT_SIZE_STEP = 0.1;
+  let currentFontSize = parseFloat(localStorage.getItem('lovecraft_font_size') || '1.05');
+  function applyFontSize() {
+    document.documentElement.style.setProperty('--page-font-size', currentFontSize + 'rem');
+    localStorage.setItem('lovecraft_font_size', String(currentFontSize));
+  }
+  document.getElementById('btn-font-minus').addEventListener('click', function() {
+    currentFontSize = Math.max(FONT_SIZE_MIN, Math.round((currentFontSize - FONT_SIZE_STEP) * 10) / 10);
+    applyFontSize();
+  });
+  document.getElementById('btn-font-plus').addEventListener('click', function() {
+    currentFontSize = Math.min(FONT_SIZE_MAX, Math.round((currentFontSize + FONT_SIZE_STEP) * 10) / 10);
+    applyFontSize();
+  });
+  applyFontSize();
 
   loadMarginNotesFromStorage();
   render();
