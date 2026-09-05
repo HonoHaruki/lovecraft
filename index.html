@@ -269,18 +269,12 @@
     color: var(--accent);
     font-size: 0.95rem;
     line-height: 1.5;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
-  .jc-sentence-row { margin-top: 4px; font-size: 0.85rem; }
-  .jc-sentence-tag {
-    display: inline-block;
-    font-size: 0.66rem;
-    color: #8a7a52;
-    border: 1px solid #3a3527;
-    border-radius: 3px;
-    padding: 1px 5px;
-    margin-right: 6px;
-    vertical-align: middle;
+  .jc-sentence-explanation {
+    font-size: 0.87rem;
+    line-height: 1.85;
+    color: #cbc4a8;
   }
 
   /* ---------- 右：欄外メモ(単語帳) ---------- */
@@ -355,6 +349,158 @@
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
   }
   .modal-actions .btn-save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .sync-section {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(43,38,32,0.25);
+  }
+  .sync-code-display {
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .sync-code-display span {
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+  .sync-buttons-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .sync-buttons-row button {
+    flex: 1;
+    border: 1px solid rgba(43,38,32,0.3);
+    background: #f4eed9;
+    color: var(--ink);
+    border-radius: 6px;
+    padding: 9px 8px;
+    font-size: 0.78rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+  .sync-join-label { font-size: 0.75rem; color: #55503f; margin: 4px 0; }
+  .sync-status { font-size: 0.8rem; min-height: 18px; color: #55503f; }
+  .sync-status.ok { color: #3a6b3a; }
+  .sync-status.err { color: #a05a4a; }
+
+  /* ---------- 単語帳・クイズ(全画面) ---------- */
+  #vocab-screen {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 200;
+    flex-direction: column;
+  }
+  #vocab-screen.show { display: flex; }
+  .vocab-header {
+    flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(env(safe-area-inset-top) + 14px) 20px 12px;
+    border-bottom: 1px solid #221f16;
+  }
+  .vocab-header button#btn-vocab-back {
+    background: none; border: none; color: var(--accent);
+    font-size: 0.9rem; font-family: 'EB Garamond', Georgia, serif;
+  }
+  .vocab-tabs { display: flex; gap: 8px; }
+  .vocab-tab {
+    border: 1px solid #3a3527;
+    background: none;
+    color: #8a8370;
+    border-radius: 6px;
+    padding: 7px 16px;
+    font-size: 0.85rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+  .vocab-tab.active { color: var(--accent); border-color: var(--accent); }
+  .vocab-body { flex: 1; overflow-y: auto; padding: 16px 24px calc(24px + env(safe-area-inset-bottom)); }
+
+  .vocab-page-heading {
+    font-family: 'EB Garamond', Georgia, serif;
+    color: var(--accent);
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+    margin: 22px 0 8px;
+    cursor: pointer;
+  }
+  .vocab-page-heading:first-child { margin-top: 0; }
+  .vocab-item {
+    position: relative;
+    font-family: 'EB Garamond', 'Iowan Old Style', Georgia, serif;
+    color: #cbc4a8;
+    border-bottom: 1px dashed #2c2a1c;
+    padding: 10px 30px 10px 4px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .vocab-item .mn-word { color: var(--accent); font-weight: 700; font-style: italic; font-size: 1.1rem; }
+  .vocab-item .mn-phonetic {
+    display: block; color: #6b6656; font-size: 0.82rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+  .vocab-item .mn-general { display: block; margin-top: 4px; color: #e4dcc0; font-weight: 600; font-size: 0.92rem; }
+  .vocab-item .mn-contextual { display: block; margin-top: 2px; color: #8a8370; font-size: 0.85rem; }
+  .vocab-delete-btn {
+    position: absolute; right: 0; top: 10px;
+    width: 26px; height: 26px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #a05a4a;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    line-height: 1;
+  }
+  .vocab-empty { color: #55503f; font-style: italic; text-align: center; margin-top: 40px; }
+
+  .quiz-card-wrap { max-width: 480px; margin: 20px auto 0; text-align: center; }
+  .quiz-progress { color: #6b6656; font-size: 0.8rem; margin-bottom: 14px; }
+  .quiz-card {
+    background: var(--paper);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 40px 24px;
+    min-height: 200px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  .quiz-card .quiz-word {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-size: 1.6rem;
+    font-style: italic;
+    color: var(--ink);
+  }
+  .quiz-card .quiz-phonetic { margin-top: 10px; color: #6b6656; font-size: 0.9rem; }
+  .quiz-card .quiz-general { margin-top: 16px; font-weight: 700; font-size: 1.05rem; }
+  .quiz-card .quiz-contextual { margin-top: 8px; color: #55503f; font-size: 0.9rem; }
+  .quiz-hint { color: #6b6656; font-size: 0.78rem; margin-top: 12px; }
+  .quiz-buttons { display: flex; gap: 10px; margin-top: 20px; }
+  .quiz-buttons button {
+    flex: 1;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #cbc4a8;
+    border-radius: 6px;
+    padding: 12px 8px;
+    font-size: 0.9rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+  .quiz-buttons .quiz-btn-known { border-color: var(--accent); color: var(--accent); }
+  .quiz-done { text-align: center; color: #8a8370; margin-top: 40px; }
+  .quiz-done button {
+    margin-top: 16px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    background: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+  }
+
+
 
   .mn-error-text {
     color: #a05a4a;
@@ -449,16 +595,27 @@
     line-height: 1.7;
   }
   .margin-note {
+    position: relative;
     font-family: 'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
     color: #cbc4a8;
     background: linear-gradient(180deg, rgba(232,223,196,0.045), transparent 70%);
     border-bottom: 1px dashed #2c2a1c;
-    padding: 10px 8px 12px;
+    padding: 10px 26px 12px 8px;
     margin: 0 -8px;
     font-size: 0.98rem;
     line-height: 1.55;
     transform: rotate(var(--tilt, 0deg));
     box-shadow: 0 1px 0 rgba(0,0,0,0.3);
+  }
+  .mn-delete-btn {
+    position: absolute; right: 2px; top: 10px;
+    width: 22px; height: 22px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #a05a4a;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    line-height: 1;
   }
   .margin-note .mn-word {
     color: var(--accent);
@@ -472,6 +629,11 @@
     font-size: 0.85rem;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     margin-top: 1px;
+  }
+  .margin-note .mn-phonetic-missing {
+    color: #a05a4a;
+    font-style: italic;
+    cursor: pointer;
   }
   .margin-note .mn-block {
     display: block;
@@ -545,6 +707,7 @@
       <div class="margin-header">
         <div class="margin-header-row">
           <div class="label">余白の走り書き</div>
+          <button id="btn-vocab" class="btn-settings" aria-label="単語帳">&#128218;</button>
           <button id="btn-settings" class="btn-settings" aria-label="設定">&#9881;</button>
         </div>
         <div class="hint">目にとまった言葉は、ここに書き留められてゆく。</div>
@@ -564,6 +727,25 @@
         <button id="btn-settings-cancel">キャンセル</button>
         <button class="btn-save" id="btn-settings-save">保存</button>
       </div>
+
+      <div class="sync-section">
+        <h3>単語帳の同期</h3>
+        <p>この端末の同期コードを他の端末に伝えると、単語帳を共有できます。</p>
+        <div class="sync-code-display">同期コード: <span id="sync-code-display"></span></div>
+        <div class="sync-buttons-row">
+          <button id="btn-sync-push">この端末の内容を送信</button>
+          <button id="btn-sync-pull">クラウドから復元</button>
+        </div>
+        <p class="sync-join-label">別の端末のコードに参加する場合はこちら</p>
+        <input type="text" id="sync-code-input" placeholder="例: 9RL4S-SQQTM" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <div class="sync-buttons-row">
+          <button id="btn-sync-join">このコードに切り替えて復元</button>
+        </div>
+        <div class="sync-buttons-row">
+          <button id="btn-sync-reset">同期コードを解除(新規発行)</button>
+        </div>
+        <div class="sync-status" id="sync-status"></div>
+      </div>
     </div>
   </div>
 
@@ -580,6 +762,20 @@
         <button id="ws-cancel">キャンセル</button>
         <button class="btn-save" id="ws-confirm">登録して意味を調べる</button>
       </div>
+    </div>
+  </div>
+
+  <div id="vocab-screen">
+    <div class="vocab-header">
+      <button id="btn-vocab-back">&#8592; 読書に戻る</button>
+      <div class="vocab-tabs">
+        <button id="vocab-tab-list" class="vocab-tab active">一覧</button>
+        <button id="vocab-tab-quiz" class="vocab-tab">クイズ</button>
+      </div>
+    </div>
+    <div class="vocab-body">
+      <div id="vocab-list-view"></div>
+      <div id="vocab-quiz-view" style="display:none;"></div>
     </div>
   </div>
 
@@ -613,6 +809,21 @@
   }
   function saveMarginNotesToStorage() {
     localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(marginNotesByPage));
+  }
+
+  // 単語帳(欄外メモ)から1件削除する
+  function deleteNoteByKey(pageIndex, key) {
+    const list = marginNotesByPage[pageIndex];
+    if (!list) return;
+    marginNotesByPage[pageIndex] = list.filter(function(n) { return n.key !== key; });
+    saveMarginNotesToStorage();
+    if (pageIndex === current) {
+      markTappedWordsOnPage();
+      renderMarginList();
+    }
+    if (document.getElementById('vocab-screen').classList.contains('show')) {
+      renderVocabList();
+    }
   }
 
   // ---------- APIキー管理 ----------
@@ -698,13 +909,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v2') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v3') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v2', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v3', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -737,8 +948,7 @@
         html += '<div class="jc-sentence">' +
           '<div class="jc-sentence-num">' + (i + 1) + '</div>' +
           '<div class="jc-sentence-en">' + (s.sentence || '') + '</div>' +
-          '<div class="jc-sentence-row"><span class="jc-sentence-tag">文法</span>' + (s.grammar || '') + '</div>' +
-          '<div class="jc-sentence-row"><span class="jc-sentence-tag">意味</span>' + (s.meaning || '') + '</div>' +
+          '<div class="jc-sentence-explanation">' + (s.explanation || '') + '</div>' +
           '</div>';
       });
       body.innerHTML = html;
@@ -763,17 +973,20 @@
 
     const paragraphEn = pagesEn[pageIndex];
     const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは英文読解を教える先生です。以下の英文の一節について、学習者向けに丁寧に解説してください。\n\n' +
+    const prompt = 'あなたは英文解釈を教える先生です。以下の英文の一節について、英語学習者向けにかなり丁寧な精読授業をしてください。' +
+      '手を抜かず、必要なだけ長く詳しく書いて構いません。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
       '次の2つを作成してください。\n' +
       '1. summary: 段落全体を俯瞰する要約解説(日本語150〜250字程度。何が起きているか、心情や背景も含めて)\n' +
-      '2. sentences: 英文を実際に登場する順で1文ずつに区切り、それぞれの文について以下を日本語で作成した配列\n' +
-      '   ・sentence: その1文の原文(英語)をそのまま\n' +
-      '   ・grammar: その文の文法・構造の解説(どこで区切れるか、修飾関係、読み違えやすい点など。40〜80字程度)\n' +
-      '   ・meaning: その文の意味・ニュアンス(直訳ではなく、この場面での感情や含みも込めて。40〜80字程度)\n\n' +
+      '2. sentences: 英文を実際に登場する順で1文ずつに区切り、それぞれの文について"explanation"(日本語)を作成した配列。' +
+      'explanationには以下を必ず含め、複数の観点を1つの自然な解説文としてまとめてください(短くまとめすぎず、じっくり書いてください)。\n' +
+      '   ・S(主語)・V(動詞)・O(目的語)・C(補語)や、修飾節・従属節・分詞構文などの構造を具体的に指摘しながら文を分解する\n' +
+      '   ・その文の中で重要な単語・熟語・言い回しがあれば、意味やニュアンスも含めて説明する\n' +
+      '   ・最終的にその文全体が何を言っているか(意味)も、直訳ではなく自然な日本語で解説の中に含める\n' +
+      '   ・sentenceには、その1文の原文(英語)をそのまま入れる\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '{"summary":"...","sentences":[{"sentence":"...","grammar":"...","meaning":"..."}]}';
+      '{"summary":"...","sentences":[{"sentence":"...","explanation":"..."}]}';
 
     try {
       const raw = await callGemini(prompt);
@@ -783,8 +996,7 @@
       const sentences = Array.isArray(parsed.sentences) ? parsed.sentences.map(function(s) {
         return {
           sentence: (s && s.sentence || '').trim(),
-          grammar: (s && s.grammar || '').trim(),
-          meaning: (s && s.meaning || '').trim()
+          explanation: (s && s.explanation || '').trim()
         };
       }).filter(function(s) { return s.sentence; }) : [];
       if (!summary && sentences.length === 0) throw new Error('空の応答');
@@ -960,12 +1172,21 @@
       const div = document.createElement('div');
       div.className = 'margin-note';
       div.style.setProperty('--tilt', (Math.random() * 1.6 - 0.8) + 'deg');
-      const phoneticLine = (note.pronunciation || note.pos)
-        ? '<span class="mn-phonetic">' + [note.pronunciation, note.pos].filter(Boolean).join('　・　') + '</span>' : '';
+      const isSingleWord = note.ranges && note.ranges.length === 1 && note.ranges[0].start === note.ranges[0].end;
+      const isBroken = !note.general && !note.contextual || (note.contextual && note.contextual.indexOf('APIキー未設定') !== -1);
+      const missingPhonetic = !isBroken && isSingleWord && !note.pronunciation && !note.pos;
+      let phoneticLine;
+      if (note.pronunciation || note.pos) {
+        phoneticLine = '<span class="mn-phonetic">' + [note.pronunciation, note.pos].filter(Boolean).join('　・　') + '</span>';
+      } else if (missingPhonetic) {
+        phoneticLine = '<span class="mn-phonetic mn-phonetic-missing">発音記号を取得</span>';
+      } else {
+        phoneticLine = '';
+      }
       if (note._repairing) {
         div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
           '<span class="mn-block mn-loading">意味を辿っています…</span>';
-      } else if (!note.general && !note.contextual || (note.contextual && note.contextual.indexOf('APIキー未設定') !== -1)) {
+      } else if (isBroken) {
         // 過去のバージョンで意味が空、またはAPIキー未設定の案内文が意味として保存されてしまったメモを、タップで取得し直せるようにする
         div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
           '<span class="mn-block mn-error-text">意味を取得できていません（タップで再取得）</span>';
@@ -976,8 +1197,22 @@
         div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
           (note.general ? '<span class="mn-block"><span class="mn-label">辞書的には</span><span class="mn-general">' + note.general + '</span></span>' : '') +
           (note.contextual ? '<span class="mn-block"><span class="mn-label">この場面では</span><span class="mn-contextual">' + note.contextual + '</span></span>' : '');
+        if (missingPhonetic) {
+          div.querySelector('.mn-phonetic-missing').addEventListener('click', function() {
+            repairMarginNote(note);
+          });
+        }
       }
       listEl.appendChild(div);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'mn-delete-btn';
+      delBtn.setAttribute('aria-label', '削除');
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        deleteNoteByKey(current, note.key);
+      });
+      div.appendChild(delBtn);
     });
     listEl.scrollTop = listEl.scrollHeight;
   }
@@ -1441,6 +1676,267 @@
     applyFontSize();
   });
   applyFontSize();
+
+  // ---------- 単語帳(全画面): 一覧・クイズ ----------
+  const vocabScreen = document.getElementById('vocab-screen');
+  function openVocabScreen() {
+    vocabScreen.classList.add('show');
+    renderVocabList();
+  }
+  function closeVocabScreen() {
+    vocabScreen.classList.remove('show');
+  }
+  document.getElementById('btn-vocab').addEventListener('click', openVocabScreen);
+  document.getElementById('btn-vocab-back').addEventListener('click', closeVocabScreen);
+
+  document.getElementById('vocab-tab-list').addEventListener('click', function() {
+    document.getElementById('vocab-tab-list').classList.add('active');
+    document.getElementById('vocab-tab-quiz').classList.remove('active');
+    document.getElementById('vocab-list-view').style.display = '';
+    document.getElementById('vocab-quiz-view').style.display = 'none';
+    renderVocabList();
+  });
+  document.getElementById('vocab-tab-quiz').addEventListener('click', function() {
+    document.getElementById('vocab-tab-quiz').classList.add('active');
+    document.getElementById('vocab-tab-list').classList.remove('active');
+    document.getElementById('vocab-quiz-view').style.display = '';
+    document.getElementById('vocab-list-view').style.display = 'none';
+    startQuiz();
+  });
+
+  function renderVocabList() {
+    const view = document.getElementById('vocab-list-view');
+    view.innerHTML = '';
+    let total = 0;
+    for (let p = 0; p < pagesEn.length; p++) {
+      const notes = marginNotesByPage[p] || [];
+      if (notes.length === 0) continue;
+      total += notes.length;
+      const heading = document.createElement('div');
+      heading.className = 'vocab-page-heading';
+      heading.textContent = (p + 1) + ' / ' + pagesEn.length + 'ページ';
+      heading.addEventListener('click', function() {
+        current = p;
+        render();
+        closeVocabScreen();
+      });
+      view.appendChild(heading);
+      notes.forEach(function(note) {
+        const item = document.createElement('div');
+        item.className = 'vocab-item';
+        const phoneticLine = (note.pronunciation || note.pos)
+          ? '<span class="mn-phonetic">' + [note.pronunciation, note.pos].filter(Boolean).join('　・　') + '</span>' : '';
+        item.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
+          (note.general ? '<span class="mn-general">' + note.general + '</span>' : '') +
+          (note.contextual ? '<span class="mn-contextual">' + note.contextual + '</span>' : '');
+        item.addEventListener('click', function() {
+          current = p;
+          render();
+          closeVocabScreen();
+        });
+        const delBtn = document.createElement('button');
+        delBtn.className = 'vocab-delete-btn';
+        delBtn.textContent = '×';
+        delBtn.setAttribute('aria-label', '削除');
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          deleteNoteByKey(p, note.key);
+        });
+        item.appendChild(delBtn);
+        view.appendChild(item);
+      });
+    }
+    if (total === 0) {
+      view.innerHTML = '<div class="vocab-empty">――まだ何も記されていない。</div>';
+    }
+  }
+
+  // ---------- クイズ ----------
+  let quizDeck = [];
+  let quizIndex = 0;
+  let quizFlipped = false;
+
+  function collectAllNotes() {
+    const all = [];
+    for (let p = 0; p < pagesEn.length; p++) {
+      (marginNotesByPage[p] || []).forEach(function(n) {
+        if (n.general || n.contextual) all.push(n);
+      });
+    }
+    return all;
+  }
+  function shuffleArray(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+  function startQuiz() {
+    quizDeck = shuffleArray(collectAllNotes());
+    quizIndex = 0;
+    quizFlipped = false;
+    renderQuiz();
+  }
+  function renderQuiz() {
+    const view = document.getElementById('vocab-quiz-view');
+    if (quizDeck.length === 0) {
+      view.innerHTML = '<div class="quiz-done">まだ復習できる単語がありません。<br>まずは本文で単語を登録してみてください。</div>';
+      return;
+    }
+    if (quizIndex >= quizDeck.length) {
+      view.innerHTML = '<div class="quiz-done">全て復習しました。<button id="quiz-restart">もう一度シャッフルする</button></div>';
+      document.getElementById('quiz-restart').addEventListener('click', startQuiz);
+      return;
+    }
+    const note = quizDeck[quizIndex];
+    const phoneticLine = (note.pronunciation || note.pos)
+      ? '<div class="quiz-phonetic">' + [note.pronunciation, note.pos].filter(Boolean).join('　・　') + '</div>' : '';
+    let cardInner;
+    if (!quizFlipped) {
+      cardInner = '<div class="quiz-word">' + note.word + '</div><div class="quiz-hint">タップして意味を見る</div>';
+    } else {
+      cardInner = '<div class="quiz-word">' + note.word + '</div>' + phoneticLine +
+        (note.general ? '<div class="quiz-general">' + note.general + '</div>' : '') +
+        (note.contextual ? '<div class="quiz-contextual">' + note.contextual + '</div>' : '');
+    }
+    view.innerHTML =
+      '<div class="quiz-card-wrap">' +
+      '<div class="quiz-progress">' + (quizIndex + 1) + ' / ' + quizDeck.length + '</div>' +
+      '<div class="quiz-card" id="quiz-card">' + cardInner + '</div>' +
+      (quizFlipped ? '<div class="quiz-buttons"><button id="quiz-btn-again">もう一度</button><button class="quiz-btn-known" id="quiz-btn-known">わかった</button></div>' : '') +
+      '</div>';
+    document.getElementById('quiz-card').addEventListener('click', function() {
+      if (!quizFlipped) { quizFlipped = true; renderQuiz(); }
+    });
+    if (quizFlipped) {
+      document.getElementById('quiz-btn-known').addEventListener('click', function() {
+        quizIndex++; quizFlipped = false; renderQuiz();
+      });
+      document.getElementById('quiz-btn-again').addEventListener('click', function() {
+        // 末尾に回してもう一度出題する
+        const item = quizDeck.splice(quizIndex, 1)[0];
+        quizDeck.push(item);
+        quizFlipped = false;
+        renderQuiz();
+      });
+    }
+  }
+
+  // ---------- 単語帳データの端末間同期(Supabase) ----------
+  const SUPABASE_URL = 'https://qndlwsktzbktqucuylok.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_sJKHIRye65QfCJhR6DbDng_bEqm_mfl';
+  const SYNC_CODE_KEY = 'lovecraft_sync_code';
+
+  function generateSyncCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 紛らわしい文字(0,O,1,I等)を除外
+    function part(n) {
+      let s = '';
+      for (let i = 0; i < n; i++) s += chars[Math.floor(Math.random() * chars.length)];
+      return s;
+    }
+    return part(5) + '-' + part(5);
+  }
+  function getSyncCode() {
+    let code = localStorage.getItem(SYNC_CODE_KEY);
+    if (!code) { code = generateSyncCode(); localStorage.setItem(SYNC_CODE_KEY, code); }
+    return code;
+  }
+  function setSyncCode(code) {
+    localStorage.setItem(SYNC_CODE_KEY, code);
+  }
+  function updateSyncCodeDisplay() {
+    document.getElementById('sync-code-display').textContent = getSyncCode();
+  }
+  function setSyncStatus(text, kind) {
+    const el = document.getElementById('sync-status');
+    el.textContent = text;
+    el.className = 'sync-status' + (kind ? ' ' + kind : '');
+  }
+
+  async function pushMarginNotesToCloud(codeOverride) {
+    const code = codeOverride || getSyncCode();
+    const res = await fetch(SUPABASE_URL + '/rest/v1/lovecraft_words?on_conflict=sync_code', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify([{ sync_code: code, data: { marginNotesByPage: marginNotesByPage }, updated_at: new Date().toISOString() }])
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+  async function pullMarginNotesFromCloud(codeOverride) {
+    const code = codeOverride || getSyncCode();
+    const res = await fetch(SUPABASE_URL + '/rest/v1/lovecraft_words?sync_code=eq.' + encodeURIComponent(code) + '&select=data,updated_at', {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = await res.json();
+    if (!rows.length) throw new Error('見つかりません');
+    return rows[0].data;
+  }
+
+  updateSyncCodeDisplay();
+
+  document.getElementById('btn-sync-push').addEventListener('click', async function() {
+    setSyncStatus('送信しています…');
+    try {
+      await pushMarginNotesToCloud();
+      setSyncStatus('送信しました。', 'ok');
+    } catch (e) {
+      console.warn('同期の送信に失敗:', e);
+      setSyncStatus('送信に失敗しました。', 'err');
+    }
+  });
+  document.getElementById('btn-sync-pull').addEventListener('click', async function() {
+    setSyncStatus('取得しています…');
+    try {
+      const data = await pullMarginNotesFromCloud();
+      if (data && data.marginNotesByPage) {
+        marginNotesByPage = data.marginNotesByPage;
+        saveMarginNotesToStorage();
+        markTappedWordsOnPage();
+        renderMarginList();
+        if (vocabScreen.classList.contains('show')) renderVocabList();
+      }
+      setSyncStatus('復元しました。', 'ok');
+    } catch (e) {
+      console.warn('同期の復元に失敗:', e);
+      setSyncStatus('復元に失敗しました。このコードのデータがまだ無い可能性があります。', 'err');
+    }
+  });
+  document.getElementById('btn-sync-join').addEventListener('click', async function() {
+    const inputEl = document.getElementById('sync-code-input');
+    const code = inputEl.value.trim().toUpperCase();
+    if (!code) { setSyncStatus('コードを入力してください。', 'err'); return; }
+    setSyncStatus('取得しています…');
+    try {
+      const data = await pullMarginNotesFromCloud(code);
+      setSyncCode(code);
+      updateSyncCodeDisplay();
+      if (data && data.marginNotesByPage) {
+        marginNotesByPage = data.marginNotesByPage;
+        saveMarginNotesToStorage();
+        markTappedWordsOnPage();
+        renderMarginList();
+        if (vocabScreen.classList.contains('show')) renderVocabList();
+      }
+      inputEl.value = '';
+      setSyncStatus('このコードに切り替えて復元しました。', 'ok');
+    } catch (e) {
+      console.warn('同期コードの参加に失敗:', e);
+      setSyncStatus('そのコードのデータが見つかりませんでした。', 'err');
+    }
+  });
+  document.getElementById('btn-sync-reset').addEventListener('click', function() {
+    setSyncCode(generateSyncCode());
+    updateSyncCodeDisplay();
+    setSyncStatus('新しい同期コードを発行しました。');
+  });
 
   loadMarginNotesFromStorage();
   render();
