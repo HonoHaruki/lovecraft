@@ -251,6 +251,37 @@
     font-size: 0.85rem;
   }
   .jp-commentary-body .jc-error { color: #a05a4a; cursor: pointer; }
+  .jc-sentence {
+    margin-top: 16px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.03);
+  }
+  .jc-sentence-num {
+    display: inline-block;
+    font-size: 0.68rem;
+    color: #6b6656;
+    margin-bottom: 4px;
+  }
+  .jc-sentence-en {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-style: italic;
+    color: var(--accent);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 6px;
+  }
+  .jc-sentence-row { margin-top: 4px; font-size: 0.85rem; }
+  .jc-sentence-tag {
+    display: inline-block;
+    font-size: 0.66rem;
+    color: #8a7a52;
+    border: 1px solid #3a3527;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
 
   /* ---------- 右：欄外メモ(単語帳) ---------- */
   .margin-col {
@@ -418,21 +449,22 @@
     line-height: 1.7;
   }
   .margin-note {
-    font-family: 'Caveat', 'EB Garamond', Georgia, serif;
+    font-family: 'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
     color: #cbc4a8;
     background: linear-gradient(180deg, rgba(232,223,196,0.045), transparent 70%);
     border-bottom: 1px dashed #2c2a1c;
     padding: 10px 8px 12px;
     margin: 0 -8px;
-    font-size: 1.15rem;
-    line-height: 1.35;
+    font-size: 0.98rem;
+    line-height: 1.55;
     transform: rotate(var(--tilt, 0deg));
     box-shadow: 0 1px 0 rgba(0,0,0,0.3);
   }
   .margin-note .mn-word {
     color: var(--accent);
     font-weight: 700;
-    font-size: 1.3rem;
+    font-style: italic;
+    font-size: 1.15rem;
   }
   .margin-note .mn-phonetic {
     display: block;
@@ -454,7 +486,7 @@
   /* 辞書的な意味の方をあえて目立たせ、文脈での意味は控えめにする(先に文脈だけ読んで済ませないように) */
   .margin-note .mn-general {
     color: #e4dcc0;
-    font-size: 1.15rem;
+    font-size: 1rem;
     font-weight: 600;
   }
   .margin-note .mn-contextual {
@@ -636,13 +668,13 @@
 
   // ---------- 単語の意味キャッシュ(端末内保存、同じ単語を何度も問い合わせない) ----------
   function loadMeaningCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings_v2') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings_v3') || '{}'); }
     catch (e) { return {}; }
   }
   function saveMeaningToCache(pageIndex, word, meaningObj) {
     const cache = loadMeaningCache();
     cache[pageIndex + ':' + word] = meaningObj;
-    localStorage.setItem('lovecraft_word_meanings_v2', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_word_meanings_v3', JSON.stringify(cache));
   }
   function getMeaningFromCache(pageIndex, word) {
     const cache = loadMeaningCache();
@@ -666,13 +698,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v1') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v2') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v1', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v2', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -691,6 +723,8 @@
     const body = document.getElementById('jp-commentary-body');
     if (!state || state.loading) {
       body.innerHTML = '<div class="jc-loading">解説を読み込んでいます…</div>';
+    } else if (state.needsKey) {
+      body.innerHTML = '<div class="jc-loading">' + state.message + '</div>';
     } else if (state.error) {
       body.innerHTML = '<div class="jc-error">取得に失敗しました（タップで再試行）</div>';
       body.querySelector('.jc-error').addEventListener('click', function(e) {
@@ -698,9 +732,16 @@
         fetchCommentaryForCurrentPage(true);
       });
     } else {
-      body.innerHTML =
-        '<span class="jc-label">文法・構文</span>' + (state.grammar || '') +
-        '<span class="jc-label">内容・文脈</span>' + (state.context || '');
+      let html = '<span class="jc-label">段落全体の要約</span>' + (state.summary || '');
+      (state.sentences || []).forEach(function(s, i) {
+        html += '<div class="jc-sentence">' +
+          '<div class="jc-sentence-num">' + (i + 1) + '</div>' +
+          '<div class="jc-sentence-en">' + (s.sentence || '') + '</div>' +
+          '<div class="jc-sentence-row"><span class="jc-sentence-tag">文法</span>' + (s.grammar || '') + '</div>' +
+          '<div class="jc-sentence-row"><span class="jc-sentence-tag">意味</span>' + (s.meaning || '') + '</div>' +
+          '</div>';
+      });
+      body.innerHTML = html;
     }
   }
 
@@ -708,37 +749,46 @@
     const pageIndex = current;
     if (!forceRefetch) {
       const cached = getCommentaryFromCache(pageIndex);
-      if (cached && (cached.grammar || cached.context)) {
+      if (cached && (cached.summary || (cached.sentences && cached.sentences.length))) {
         renderCommentaryState(cached);
         return;
       }
     }
     const apiKey = getApiKey();
     if (!apiKey) {
-      renderCommentaryState({ error: false, grammar: 'APIキー未設定（右上の設定から入力してください）', context: '' });
+      renderCommentaryState({ needsKey: true, message: 'APIキー未設定（右上の設定から入力してください）' });
       return;
     }
     renderCommentaryState({ loading: true });
 
     const paragraphEn = pagesEn[pageIndex];
     const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは英文読解を助ける先生です。以下の英文の一節について解説してください。\n\n' +
+    const prompt = 'あなたは英文読解を教える先生です。以下の英文の一節について、学習者向けに丁寧に解説してください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
-      '次の2種類の解説を、それぞれ日本語で150〜250字程度で書いてください。\n' +
-      '・grammar: 文法・構文の面で特に構造が複雑だったり読み違えやすい部分を、文の作りを分解しながら分かりやすく説明する\n' +
-      '・context: この場面で何が起きているか、心情や背景も含めた内容・文脈の解説\n\n' +
+      '次の2つを作成してください。\n' +
+      '1. summary: 段落全体を俯瞰する要約解説(日本語150〜250字程度。何が起きているか、心情や背景も含めて)\n' +
+      '2. sentences: 英文を実際に登場する順で1文ずつに区切り、それぞれの文について以下を日本語で作成した配列\n' +
+      '   ・sentence: その1文の原文(英語)をそのまま\n' +
+      '   ・grammar: その文の文法・構造の解説(どこで区切れるか、修飾関係、読み違えやすい点など。40〜80字程度)\n' +
+      '   ・meaning: その文の意味・ニュアンス(直訳ではなく、この場面での感情や含みも込めて。40〜80字程度)\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '{"grammar":"...","context":"..."}';
+      '{"summary":"...","sentences":[{"sentence":"...","grammar":"...","meaning":"..."}]}';
 
     try {
       const raw = await callGemini(prompt);
       const jsonStr = raw.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
-      const grammar = (parsed.grammar || '').trim();
-      const context = (parsed.context || '').trim();
-      if (!grammar && !context) throw new Error('空の応答');
-      const result = { loading: false, error: false, grammar: grammar, context: context };
+      const summary = (parsed.summary || '').trim();
+      const sentences = Array.isArray(parsed.sentences) ? parsed.sentences.map(function(s) {
+        return {
+          sentence: (s && s.sentence || '').trim(),
+          grammar: (s && s.grammar || '').trim(),
+          meaning: (s && s.meaning || '').trim()
+        };
+      }).filter(function(s) { return s.sentence; }) : [];
+      if (!summary && sentences.length === 0) throw new Error('空の応答');
+      const result = { loading: false, error: false, summary: summary, sentences: sentences };
       saveCommentaryToCache(pageIndex, result);
       if (pageIndex === current) renderCommentaryState(result);
     } catch (e) {
@@ -915,8 +965,8 @@
       if (note._repairing) {
         div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
           '<span class="mn-block mn-loading">意味を辿っています…</span>';
-      } else if (!note.general && !note.contextual) {
-        // 過去のバージョンで意味が空のまま保存されてしまったメモを、タップで取得し直せるようにする
+      } else if (!note.general && !note.contextual || (note.contextual && note.contextual.indexOf('APIキー未設定') !== -1)) {
+        // 過去のバージョンで意味が空、またはAPIキー未設定の案内文が意味として保存されてしまったメモを、タップで取得し直せるようにする
         div.innerHTML = '<span class="mn-word">' + note.word + '</span>' + phoneticLine +
           '<span class="mn-block mn-error-text">意味を取得できていません（タップで再取得）</span>';
         div.querySelector('.mn-error-text').addEventListener('click', function() {
@@ -1008,6 +1058,9 @@
     if (!wsPreview || wsPreview.loading) {
       el.innerHTML = '<div class="ws-preview-loading">意味を辿っています…</div>';
       confirmBtn.disabled = true;
+    } else if (wsPreview.needsKey) {
+      el.innerHTML = '<div class="ws-preview-loading">' + wsPreview.contextual + '</div>';
+      confirmBtn.disabled = true;
     } else if (wsPreview.error || (!wsPreview.general && !wsPreview.contextual)) {
       // 何らかの理由で意味が空のまま返ってきた場合も、失敗と同じ扱いにして再試行させる
       el.innerHTML = '<div class="ws-preview-error">取得に失敗しました（タップで再試行）</div>';
@@ -1058,7 +1111,7 @@
 
     const apiKey = getApiKey();
     if (!apiKey) {
-      wsPreview = { loading: false, error: false, general: '', contextual: 'APIキー未設定（右上の設定から入力してください）', pos: '', pronunciation: '' };
+      wsPreview = { loading: false, error: false, needsKey: true, general: '', contextual: 'APIキー未設定（右上の設定から入力してください）', pos: '', pronunciation: '' };
       renderWsPreview();
       return;
     }
@@ -1157,7 +1210,7 @@
     if (e.target === document.getElementById('word-sheet-modal')) closeWordSheet();
   });
   document.getElementById('ws-confirm').addEventListener('click', function() {
-    if (!wsSelection || !wsPreview || wsPreview.loading || wsPreview.error) return;
+    if (!wsSelection || !wsPreview || wsPreview.loading || wsPreview.error || wsPreview.needsKey) return;
     const ranges = wsSelection.ranges;
     const key = phraseKeyFromRanges(ranges);
     const word = phraseTextFromRanges(ranges);
