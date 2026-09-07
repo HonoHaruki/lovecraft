@@ -251,31 +251,46 @@
     font-size: 0.85rem;
   }
   .jp-commentary-body .jc-error { color: #a05a4a; cursor: pointer; }
-  .jc-sentence {
-    margin-top: 16px;
+
+  .jc-quote {
+    font-family: 'EB Garamond', Georgia, serif;
+    font-style: italic;
+    color: var(--accent);
+    font-size: 0.92rem;
+    line-height: 1.7;
+    background: rgba(255,255,255,0.04);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    margin-bottom: 6px;
+  }
+  .jc-grammar-point {
+    margin-top: 12px;
     padding: 10px 12px;
     border-radius: 6px;
     background: rgba(255,255,255,0.03);
   }
-  .jc-sentence-num {
+  .jc-grammar-tag {
     display: inline-block;
-    font-size: 0.68rem;
-    color: #6b6656;
-    margin-bottom: 4px;
+    font-size: 0.72rem;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 1px 7px;
+    margin-bottom: 6px;
   }
-  .jc-sentence-en {
+  .jc-grammar-excerpt {
     font-family: 'EB Garamond', Georgia, serif;
     font-style: italic;
-    color: var(--accent);
-    font-size: 0.95rem;
+    color: #d7cba0;
+    font-size: 0.88rem;
     line-height: 1.5;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
   }
-  .jc-sentence-explanation {
-    font-size: 0.87rem;
-    line-height: 1.85;
-    color: #cbc4a8;
-  }
+  .jc-grammar-explanation { font-size: 0.86rem; line-height: 1.8; color: #cbc4a8; }
+  .jc-vocab-list { margin: 4px 0 0; padding-left: 18px; }
+  .jc-vocab-list li { margin-bottom: 8px; font-size: 0.86rem; line-height: 1.7; color: #cbc4a8; }
+  .jc-vocab-word { color: var(--accent); font-weight: 700; font-style: italic; margin-right: 6px; }
+  .jc-context { font-size: 0.87rem; line-height: 1.85; color: #cbc4a8; }
 
   /* ---------- 右：欄外メモ(単語帳) ---------- */
   .margin-col {
@@ -430,7 +445,7 @@
     font-family: 'EB Garamond', 'Iowan Old Style', Georgia, serif;
     color: #cbc4a8;
     border-bottom: 1px dashed #2c2a1c;
-    padding: 10px 30px 10px 4px;
+    padding: 10px 60px 10px 4px;
     font-size: 0.95rem;
     line-height: 1.5;
     cursor: pointer;
@@ -450,6 +465,16 @@
     color: #a05a4a;
     border-radius: 50%;
     font-size: 0.8rem;
+    line-height: 1;
+  }
+  .vocab-refresh-btn {
+    position: absolute; right: 32px; top: 10px;
+    width: 26px; height: 26px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #8a8370;
+    border-radius: 50%;
+    font-size: 0.85rem;
     line-height: 1;
   }
   .vocab-empty { color: #55503f; font-style: italic; text-align: center; margin-top: 40px; }
@@ -600,7 +625,7 @@
     color: #cbc4a8;
     background: linear-gradient(180deg, rgba(232,223,196,0.045), transparent 70%);
     border-bottom: 1px dashed #2c2a1c;
-    padding: 10px 26px 12px 8px;
+    padding: 10px 56px 12px 8px;
     margin: 0 -8px;
     font-size: 0.98rem;
     line-height: 1.55;
@@ -616,6 +641,26 @@
     border-radius: 50%;
     font-size: 0.7rem;
     line-height: 1;
+  }
+  .mn-refresh-btn {
+    position: absolute; right: 28px; top: 10px;
+    width: 22px; height: 22px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #8a8370;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+  .mn-delete-btn.confirming,
+  .vocab-delete-btn.confirming {
+    width: auto;
+    border-radius: 4px;
+    padding: 0 8px;
+    font-size: 0.7rem;
+    background: #a05a4a;
+    color: #fff;
+    border-color: #a05a4a;
   }
   .margin-note .mn-word {
     color: var(--accent);
@@ -812,6 +857,29 @@
   }
 
   // 単語帳(欄外メモ)から1件削除する
+  // 誤操作防止: 1回目のタップで「本当に削除？」に変わり、3秒以内にもう一度押すと削除される
+  function attachDeleteConfirm(btn, onConfirm) {
+    let confirming = false;
+    let timer = null;
+    btn.textContent = '×';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!confirming) {
+        confirming = true;
+        btn.textContent = '確認';
+        btn.classList.add('confirming');
+        timer = setTimeout(function() {
+          confirming = false;
+          btn.textContent = '×';
+          btn.classList.remove('confirming');
+        }, 3000);
+      } else {
+        clearTimeout(timer);
+        onConfirm();
+      }
+    });
+  }
+
   function deleteNoteByKey(pageIndex, key) {
     const list = marginNotesByPage[pageIndex];
     if (!list) return;
@@ -909,13 +977,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v3') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v4') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v3', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v4', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -943,14 +1011,25 @@
         fetchCommentaryForCurrentPage(true);
       });
     } else {
-      let html = '<span class="jc-label">段落全体の要約</span>' + (state.summary || '');
-      (state.sentences || []).forEach(function(s, i) {
-        html += '<div class="jc-sentence">' +
-          '<div class="jc-sentence-num">' + (i + 1) + '</div>' +
-          '<div class="jc-sentence-en">' + (s.sentence || '') + '</div>' +
-          '<div class="jc-sentence-explanation">' + (s.explanation || '') + '</div>' +
+      let html = '<div class="jc-quote">' + (state.quote || '') + '</div>';
+
+      html += '<span class="jc-label">1. 文法解析</span>';
+      (state.grammarPoints || []).forEach(function(g) {
+        html += '<div class="jc-grammar-point">' +
+          '<div class="jc-grammar-tag">' + (g.tag || '') + '</div>' +
+          '<div class="jc-grammar-excerpt">' + (g.excerpt || '') + '</div>' +
+          '<div class="jc-grammar-explanation">' + (g.explanation || '') + '</div>' +
           '</div>';
       });
+
+      html += '<span class="jc-label">2. 重要単語・熟語</span><ul class="jc-vocab-list">';
+      (state.vocab || []).forEach(function(v) {
+        html += '<li><span class="jc-vocab-word">' + (v.word || '') + '</span>' + (v.meaning || '') + '</li>';
+      });
+      html += '</ul>';
+
+      html += '<span class="jc-label">3. 文脈ニュアンス</span><div class="jc-context">' + (state.context || '') + '</div>';
+
       body.innerHTML = html;
     }
   }
@@ -959,7 +1038,7 @@
     const pageIndex = current;
     if (!forceRefetch) {
       const cached = getCommentaryFromCache(pageIndex);
-      if (cached && (cached.summary || (cached.sentences && cached.sentences.length))) {
+      if (cached && (cached.context || (cached.grammarPoints && cached.grammarPoints.length))) {
         renderCommentaryState(cached);
         return;
       }
@@ -973,34 +1052,42 @@
 
     const paragraphEn = pagesEn[pageIndex];
     const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは英文解釈を教える先生です。以下の英文の一節について、英語学習者向けにかなり丁寧な精読授業をしてください。' +
-      '手を抜かず、必要なだけ長く詳しく書いて構いません。\n\n' +
+    const prompt = 'あなたは英文解釈を教える先生です。以下の英文の一節について、日本の高校〜大学レベルの英語学習者向けに解説を作成してください。' +
+      '文体は「です・ます調」で統一し、「〜のだ」「〜である」のような常体を混ぜないでください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
-      '次の2つを作成してください。\n' +
-      '1. summary: 段落全体を俯瞰する要約解説(日本語150〜250字程度。何が起きているか、心情や背景も含めて)\n' +
-      '2. sentences: 英文を実際に登場する順で1文ずつに区切り、それぞれの文について"explanation"(日本語)を作成した配列。' +
-      'explanationには以下を必ず含め、複数の観点を1つの自然な解説文としてまとめてください(短くまとめすぎず、じっくり書いてください)。\n' +
-      '   ・S(主語)・V(動詞)・O(目的語)・C(補語)や、修飾節・従属節・分詞構文などの構造を具体的に指摘しながら文を分解する\n' +
-      '   ・その文の中で重要な単語・熟語・言い回しがあれば、意味やニュアンスも含めて説明する\n' +
-      '   ・最終的にその文全体が何を言っているか(意味)も、直訳ではなく自然な日本語で解説の中に含める\n' +
-      '   ・sentenceには、その1文の原文(英語)をそのまま入れる\n\n' +
+      '次の4つを作成してください。\n' +
+      '1. quote: 英文原文をそのまま(改変しない)\n' +
+      '2. grammarPoints: 段落の中で特に構造が複雑だったり読み違えやすい箇所を2〜4個だけ選び、それぞれ以下を持つ配列。' +
+      '全ての文を網羅する必要はなく、本当に解説する価値がある箇所だけに絞ってください。\n' +
+      '   ・tag: その箇所の構造の呼び方(例: "主節", "関係副詞節", "分詞構文" など)\n' +
+      '   ・excerpt: その箇所の原文抜粋\n' +
+      '   ・explanation: なぜその構造なのか、どう読めばよいかの説明\n' +
+      '3. vocab: その段落の中で重要な単語・熟語・言い回しを3〜8個選んだ配列。それぞれ以下を持つ\n' +
+      '   ・word: 原文での表記\n' +
+      '   ・meaning: 意味やニュアンスの説明(この文脈での使われ方も踏まえる)\n' +
+      '4. context: この段落で何が起きているか、心情や背景も含めた文脈・ニュアンスの解説(150〜300字程度の自然な文章)\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '{"summary":"...","sentences":[{"sentence":"...","explanation":"..."}]}';
+      '{"quote":"...","grammarPoints":[{"tag":"...","excerpt":"...","explanation":"..."}],"vocab":[{"word":"...","meaning":"..."}],"context":"..."}';
 
     try {
       const raw = await callGemini(prompt);
       const jsonStr = raw.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
-      const summary = (parsed.summary || '').trim();
-      const sentences = Array.isArray(parsed.sentences) ? parsed.sentences.map(function(s) {
+      const quote = (parsed.quote || paragraphEn || '').trim();
+      const grammarPoints = Array.isArray(parsed.grammarPoints) ? parsed.grammarPoints.map(function(g) {
         return {
-          sentence: (s && s.sentence || '').trim(),
-          explanation: (s && s.explanation || '').trim()
+          tag: (g && g.tag || '').trim(),
+          excerpt: (g && g.excerpt || '').trim(),
+          explanation: (g && g.explanation || '').trim()
         };
-      }).filter(function(s) { return s.sentence; }) : [];
-      if (!summary && sentences.length === 0) throw new Error('空の応答');
-      const result = { loading: false, error: false, summary: summary, sentences: sentences };
+      }).filter(function(g) { return g.explanation; }) : [];
+      const vocab = Array.isArray(parsed.vocab) ? parsed.vocab.map(function(v) {
+        return { word: (v && v.word || '').trim(), meaning: (v && v.meaning || '').trim() };
+      }).filter(function(v) { return v.word; }) : [];
+      const context = (parsed.context || '').trim();
+      if (!context && grammarPoints.length === 0 && vocab.length === 0) throw new Error('空の応答');
+      const result = { loading: false, error: false, quote: quote, grammarPoints: grammarPoints, vocab: vocab, context: context };
       saveCommentaryToCache(pageIndex, result);
       if (pageIndex === current) renderCommentaryState(result);
     } catch (e) {
@@ -1207,12 +1294,19 @@
       const delBtn = document.createElement('button');
       delBtn.className = 'mn-delete-btn';
       delBtn.setAttribute('aria-label', '削除');
-      delBtn.textContent = '×';
-      delBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        deleteNoteByKey(current, note.key);
-      });
+      attachDeleteConfirm(delBtn, function() { deleteNoteByKey(current, note.key); });
       div.appendChild(delBtn);
+      if (!note._repairing) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'mn-refresh-btn';
+        refreshBtn.setAttribute('aria-label', '意味を再取得');
+        refreshBtn.textContent = '\u21BB';
+        refreshBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          repairMarginNote(note);
+        });
+        div.appendChild(refreshBtn);
+      }
     });
     listEl.scrollTop = listEl.scrollHeight;
   }
@@ -1220,9 +1314,15 @@
   // 過去のバージョンなどで意味が空のまま保存されてしまったメモを、その場で取得し直す
   async function repairMarginNote(note) {
     const apiKey = getApiKey();
-    if (!apiKey) return;
+    if (!apiKey) {
+      note.contextual = 'APIキー未設定（右上の設定から入力してください）';
+      renderMarginList();
+      if (document.getElementById('vocab-screen').classList.contains('show')) renderVocabList();
+      return;
+    }
     note._repairing = true;
     renderMarginList();
+    if (document.getElementById('vocab-screen').classList.contains('show')) renderVocabList();
 
     const paragraphEn = pagesEn[note.pageIndex];
     const paragraphJp = pagesJp[note.pageIndex];
@@ -1255,6 +1355,7 @@
     }
     note._repairing = false;
     renderMarginList();
+    if (document.getElementById('vocab-screen').classList.contains('show')) renderVocabList();
   }
 
   function markTappedWordsOnPage() {
@@ -1489,20 +1590,21 @@
     if (current < pagesEn.length - 1) { current++; render(); }
   });
 
-  // ---------- 日本語訳シートの開閉・高さ(半分/全画面)の管理 ----------
-  let jpHeightHalf = 300;
-  let jpHeightFull = 500;
-  let jpState = 'half'; // 'half' | 'full'
+  // ---------- 日本語訳シートの開閉・高さの管理(指を離した位置で自由に止まる) ----------
+  let jpHeightDefault = 300;
+  let jpHeightMax = 500;
+  const JP_HEIGHT_MIN = 90;
+  let jpCurrentHeight = jpHeightDefault;
   const jpSheetEl = document.getElementById('jp-sheet');
 
   function openJpSheet() {
     jpVisible = true;
-    jpState = 'half';
+    jpCurrentHeight = jpHeightDefault;
     jpSheetEl.style.transition = 'none';
-    jpSheetEl.style.height = jpHeightHalf + 'px';
+    jpSheetEl.style.height = jpCurrentHeight + 'px';
     // transformのtransitionだけ効かせるため、高さ確定後に戻す
     void jpSheetEl.offsetHeight;
-    jpSheetEl.style.transition = 'transform 0.25s ease, height 0.25s ease';
+    jpSheetEl.style.transition = 'transform 0.25s ease';
     jpSheetEl.classList.add('show');
   }
   function closeJpSheet() {
@@ -1520,7 +1622,7 @@
     closeJpSheet();
   });
 
-  // ---------- ドラッグハンドル: 上に引くと全画面、下に引くと半分/閉じる ----------
+  // ---------- ドラッグハンドル: 指の動きにそのまま追従し、離した位置の高さで止まる ----------
   (function() {
     const handle = document.getElementById('jp-drag-handle');
     let dragging = false;
@@ -1538,26 +1640,23 @@
       if (!dragging) return;
       const delta = startY - e.clientY; // 上にドラッグ = 正の値
       let h = startHeight + delta;
-      h = Math.min(jpHeightFull, Math.max(60, h));
+      h = Math.min(jpHeightMax, Math.max(JP_HEIGHT_MIN * 0.6, h));
       jpSheetEl.style.height = h + 'px';
     });
     function endDrag() {
       if (!dragging) return;
       dragging = false;
-      jpSheetEl.style.transition = 'transform 0.25s ease, height 0.25s ease';
+      jpSheetEl.style.transition = 'transform 0.2s ease, height 0.2s ease';
       const h = jpSheetEl.getBoundingClientRect().height;
-      const midPoint = (jpHeightHalf + jpHeightFull) / 2;
-      if (h < jpHeightHalf * 0.55) {
+      if (h < JP_HEIGHT_MIN) {
         // 大きく下に引いたら閉じる
-        jpSheetEl.style.height = jpHeightHalf + 'px';
+        jpSheetEl.style.height = jpHeightDefault + 'px';
         closeJpSheet();
-        jpState = 'half';
-      } else if (h > midPoint) {
-        jpState = 'full';
-        jpSheetEl.style.height = jpHeightFull + 'px';
+        jpCurrentHeight = jpHeightDefault;
       } else {
-        jpState = 'half';
-        jpSheetEl.style.height = jpHeightHalf + 'px';
+        // その位置でそのまま止まる
+        jpCurrentHeight = Math.min(jpHeightMax, h);
+        jpSheetEl.style.height = jpCurrentHeight + 'px';
       }
     }
     handle.addEventListener('pointerup', endDrag);
@@ -1571,20 +1670,22 @@
     if (footer) {
       document.documentElement.style.setProperty('--footer-h', footer.offsetHeight + 'px');
     }
-    // 日本語訳シートの「半分」「全画面」それぞれの高さを実測して更新する
+    // 日本語訳シートの初期の高さ・ドラッグできる上限を実測して更新する
     if (footer && bookCol) {
       const available = bookCol.clientHeight - footer.offsetHeight;
-      jpHeightFull = Math.max(200, available - 50); // 上部が少し見える余白を残す
-      jpHeightHalf = Math.max(160, Math.round(available * 0.5));
-      // 開いている最中にリサイズされた場合、現在の状態に合わせて高さを再適用
+      jpHeightMax = Math.max(200, available - 50); // 上部が少し見える余白を残す
+      jpHeightDefault = Math.max(160, Math.round(available * 0.5));
+      // 開いている最中にリサイズされた場合、現在の高さが新しい上限を超えないよう調整
       if (jpVisible) {
-        jpSheetEl.style.height = (jpState === 'full' ? jpHeightFull : jpHeightHalf) + 'px';
+        jpCurrentHeight = Math.min(jpCurrentHeight, jpHeightMax);
+        jpSheetEl.style.height = jpCurrentHeight + 'px';
       }
     }
   }
   window.addEventListener('resize', syncFooterHeight);
   window.addEventListener('orientationchange', syncFooterHeight);
   syncFooterHeight();
+
 
   // ---------- 巻物画像の羊皮紙部分に合わせて本文エリアの位置・大きさを実測配置する ----------
   // 背景はbackground-size:coverなので、コンテナと画像の縦横比によって
@@ -1736,13 +1837,20 @@
         });
         const delBtn = document.createElement('button');
         delBtn.className = 'vocab-delete-btn';
-        delBtn.textContent = '×';
         delBtn.setAttribute('aria-label', '削除');
-        delBtn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          deleteNoteByKey(p, note.key);
-        });
+        attachDeleteConfirm(delBtn, function() { deleteNoteByKey(p, note.key); });
         item.appendChild(delBtn);
+        if (!note._repairing) {
+          const refreshBtn = document.createElement('button');
+          refreshBtn.className = 'vocab-refresh-btn';
+          refreshBtn.setAttribute('aria-label', '意味を再取得');
+          refreshBtn.textContent = '\u21BB';
+          refreshBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            repairMarginNote(note);
+          });
+          item.appendChild(refreshBtn);
+        }
         view.appendChild(item);
       });
     }
