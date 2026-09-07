@@ -252,6 +252,13 @@
   }
   .jp-commentary-body .jc-error { color: #a05a4a; cursor: pointer; }
 
+  .jc-intro {
+    font-size: 0.9rem;
+    line-height: 1.85;
+    color: #d7cba0;
+    font-style: italic;
+    margin-bottom: 12px;
+  }
   .jc-quote {
     font-family: 'EB Garamond', Georgia, serif;
     font-style: italic;
@@ -276,16 +283,42 @@
     border: 1px solid var(--accent);
     border-radius: 3px;
     padding: 1px 7px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
-  .jc-grammar-excerpt {
+  .jc-grammar-chunks {
+    margin-bottom: 8px;
+    line-height: 2.1;
+  }
+  .jc-chunk {
+    display: inline-block;
     font-family: 'EB Garamond', Georgia, serif;
     font-style: italic;
-    color: #d7cba0;
     font-size: 0.88rem;
-    line-height: 1.5;
-    margin-bottom: 5px;
+    padding: 2px 7px 2px 4px;
+    border-radius: 4px;
+    margin: 2px 2px;
+    border: 1px solid;
   }
+  .jc-chunk-label {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-style: normal;
+    font-weight: 700;
+    font-size: 0.62rem;
+    border-radius: 3px;
+    padding: 0px 4px;
+    margin-right: 5px;
+    vertical-align: middle;
+  }
+  .jc-chunk-S { color: #9fd0f0; border-color: #4a6b7a; background: rgba(120,180,220,0.08); }
+  .jc-chunk-S .jc-chunk-label { background: #4a6b7a; color: #dff0ff; }
+  .jc-chunk-V { color: var(--accent); border-color: #8a6a2a; background: rgba(200,160,90,0.1); }
+  .jc-chunk-V .jc-chunk-label { background: #8a6a2a; color: #fff2d5; }
+  .jc-chunk-O { color: #e0a888; border-color: #8a5a3a; background: rgba(220,140,100,0.08); }
+  .jc-chunk-O .jc-chunk-label { background: #8a5a3a; color: #ffe6d5; }
+  .jc-chunk-C { color: #c0a8e0; border-color: #6a4a8a; background: rgba(180,140,220,0.08); }
+  .jc-chunk-C .jc-chunk-label { background: #6a4a8a; color: #ecdcff; }
+  .jc-chunk-M { color: #a8a290; border-color: #4a4638; background: rgba(150,145,130,0.06); }
+  .jc-chunk-M .jc-chunk-label { background: #4a4638; color: #d8d4c4; }
   .jc-grammar-explanation { font-size: 0.86rem; line-height: 1.8; color: #cbc4a8; }
   .jc-vocab-list { margin: 4px 0 0; padding-left: 18px; }
   .jc-vocab-list li { margin-bottom: 8px; font-size: 0.86rem; line-height: 1.7; color: #cbc4a8; }
@@ -652,16 +685,6 @@
     font-size: 0.75rem;
     line-height: 1;
   }
-  .mn-delete-btn.confirming,
-  .vocab-delete-btn.confirming {
-    width: auto;
-    border-radius: 4px;
-    padding: 0 8px;
-    font-size: 0.7rem;
-    background: #a05a4a;
-    color: #fff;
-    border-color: #a05a4a;
-  }
   .margin-note .mn-word {
     color: var(--accent);
     font-weight: 700;
@@ -848,33 +871,29 @@
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_NOTES) || '{}');
       marginNotesByPage = saved || {};
+      // 読み込み中フラグ(_repairing)は一時的な状態であり保存対象ではないが、
+      // 過去のバージョンで保存されてしまった場合に固まって見えるのを防ぐため、読込時に必ず取り除く
+      Object.keys(marginNotesByPage).forEach(function(p) {
+        (marginNotesByPage[p] || []).forEach(function(n) { delete n._repairing; });
+      });
     } catch (e) {
       marginNotesByPage = {};
     }
   }
   function saveMarginNotesToStorage() {
-    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(marginNotesByPage));
+    localStorage.setItem(STORAGE_KEY_NOTES, JSON.stringify(marginNotesByPage, function(k, v) {
+      return k === '_repairing' ? undefined : v;
+    }));
   }
 
   // 単語帳(欄外メモ)から1件削除する
-  // 誤操作防止: 1回目のタップで「本当に削除？」に変わり、3秒以内にもう一度押すと削除される
-  function attachDeleteConfirm(btn, onConfirm) {
-    let confirming = false;
-    let timer = null;
+  // 誤操作防止: 標準の確認ダイアログを出し、OKされたら削除する
+  function attachDeleteConfirm(btn, onConfirm, wordLabel) {
     btn.textContent = '×';
     btn.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (!confirming) {
-        confirming = true;
-        btn.textContent = '確認';
-        btn.classList.add('confirming');
-        timer = setTimeout(function() {
-          confirming = false;
-          btn.textContent = '×';
-          btn.classList.remove('confirming');
-        }, 3000);
-      } else {
-        clearTimeout(timer);
+      const message = wordLabel ? ('「' + wordLabel + '」を単語帳から削除しますか？') : 'この単語を単語帳から削除しますか？';
+      if (window.confirm(message)) {
         onConfirm();
       }
     });
@@ -977,13 +996,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v4') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v5') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v4', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v5', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -1011,13 +1030,18 @@
         fetchCommentaryForCurrentPage(true);
       });
     } else {
-      let html = '<div class="jc-quote">' + (state.quote || '') + '</div>';
+      let html = '';
+      if (state.intro) html += '<div class="jc-intro">' + state.intro + '</div>';
+      html += '<div class="jc-quote">' + (state.quote || '') + '</div>';
 
       html += '<span class="jc-label">1. 文法解析</span>';
       (state.grammarPoints || []).forEach(function(g) {
         html += '<div class="jc-grammar-point">' +
           '<div class="jc-grammar-tag">' + (g.tag || '') + '</div>' +
-          '<div class="jc-grammar-excerpt">' + (g.excerpt || '') + '</div>' +
+          '<div class="jc-grammar-chunks">' + (g.chunks || []).map(function(c) {
+            return '<span class="jc-chunk jc-chunk-' + (c.label || 'M').toUpperCase() + '">' +
+              '<span class="jc-chunk-label">' + (c.label || '') + '</span>' + (c.text || '') + '</span>';
+          }).join(' ') + '</div>' +
           '<div class="jc-grammar-explanation">' + (g.explanation || '') + '</div>' +
           '</div>';
       });
@@ -1052,33 +1076,43 @@
 
     const paragraphEn = pagesEn[pageIndex];
     const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは英文解釈を教える先生です。以下の英文の一節について、日本の高校〜大学レベルの英語学習者向けに解説を作成してください。' +
-      '文体は「です・ます調」で統一し、「〜のだ」「〜である」のような常体を混ぜないでください。\n\n' +
+    const prompt = 'あなたは古い恐怖小説を愛読している、博識で親しみやすい先輩読者です。後輩の英語学習者に、隣に座って語りかけるような温かい調子で、' +
+      '以下の英文の一節を読み解いてあげてください。教科書的な無味乾燥さは避け、丁寧語(です・ます調)は保ちながらも、' +
+      '人間味とホラー作品らしい雰囲気を感じられる語り口にしてください。「〜のだ」「〜である」のような常体は混ぜないでください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
-      '次の4つを作成してください。\n' +
-      '1. quote: 英文原文をそのまま(改変しない)\n' +
-      '2. grammarPoints: 段落の中で特に構造が複雑だったり読み違えやすい箇所を2〜4個だけ選び、それぞれ以下を持つ配列。' +
+      '次の5つを作成してください。\n' +
+      '1. intro: 本題に入る前の一言(1〜2文)。この場面がどんな情景・感情かに寄り添う、雰囲気のある書き出し\n' +
+      '2. quote: 英文原文をそのまま(改変しない)\n' +
+      '3. grammarPoints: 段落の中で特に構造が複雑だったり読み違えやすい箇所を2〜4個だけ選び、それぞれ以下を持つ配列。' +
       '全ての文を網羅する必要はなく、本当に解説する価値がある箇所だけに絞ってください。\n' +
       '   ・tag: その箇所の構造の呼び方(例: "主節", "関係副詞節", "分詞構文" など)\n' +
-      '   ・excerpt: その箇所の原文抜粋\n' +
-      '   ・explanation: なぜその構造なのか、どう読めばよいかの説明\n' +
-      '3. vocab: その段落の中で重要な単語・熟語・言い回しを3〜8個選んだ配列。それぞれ以下を持つ\n' +
+      '   ・chunks: その箇所の原文を、意味のまとまりごとに区切って並べた配列。それぞれ以下を持つ\n' +
+      '      - label: "S"(主語) / "V"(動詞) / "O"(目的語) / "C"(補語) / "M"(修飾語・従属節など、S/V/O/Cに当てはまらないもの) のいずれか\n' +
+      '      - text: その部分の原文そのまま\n' +
+      '      (chunksを順番通りに繋げると、そのexcerpt全体の原文に戻ることを確認してください)\n' +
+      '   ・explanation: なぜその構造なのか、どう読めばよいかを、丁寧だが温かい語り口で\n' +
+      '4. vocab: その段落の中で重要な単語・熟語・言い回しを3〜8個選んだ配列。それぞれ以下を持つ\n' +
       '   ・word: 原文での表記\n' +
-      '   ・meaning: 意味やニュアンスの説明(この文脈での使われ方も踏まえる)\n' +
-      '4. context: この段落で何が起きているか、心情や背景も含めた文脈・ニュアンスの解説(150〜300字程度の自然な文章)\n\n' +
+      '   ・meaning: 意味やニュアンスに加えて、作者がなぜその言葉を選んだと考えられるかも一言添える\n' +
+      '5. context: この段落で何が起きているか、心情や背景も含めた文脈・ニュアンスの解説(150〜300字程度)。' +
+      '解説というより、隣で物語を語ってくれるような温度感で\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
-      '{"quote":"...","grammarPoints":[{"tag":"...","excerpt":"...","explanation":"..."}],"vocab":[{"word":"...","meaning":"..."}],"context":"..."}';
+      '{"intro":"...","quote":"...","grammarPoints":[{"tag":"...","chunks":[{"label":"S","text":"..."}],"explanation":"..."}],"vocab":[{"word":"...","meaning":"..."}],"context":"..."}';
 
     try {
       const raw = await callGemini(prompt);
       const jsonStr = raw.trim().replace(/```json/gi, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(jsonStr);
+      const intro = (parsed.intro || '').trim();
       const quote = (parsed.quote || paragraphEn || '').trim();
       const grammarPoints = Array.isArray(parsed.grammarPoints) ? parsed.grammarPoints.map(function(g) {
+        const chunks = Array.isArray(g && g.chunks) ? g.chunks.map(function(c) {
+          return { label: (c && c.label || 'M').trim(), text: (c && c.text || '').trim() };
+        }).filter(function(c) { return c.text; }) : [];
         return {
           tag: (g && g.tag || '').trim(),
-          excerpt: (g && g.excerpt || '').trim(),
+          chunks: chunks,
           explanation: (g && g.explanation || '').trim()
         };
       }).filter(function(g) { return g.explanation; }) : [];
@@ -1087,7 +1121,7 @@
       }).filter(function(v) { return v.word; }) : [];
       const context = (parsed.context || '').trim();
       if (!context && grammarPoints.length === 0 && vocab.length === 0) throw new Error('空の応答');
-      const result = { loading: false, error: false, quote: quote, grammarPoints: grammarPoints, vocab: vocab, context: context };
+      const result = { loading: false, error: false, intro: intro, quote: quote, grammarPoints: grammarPoints, vocab: vocab, context: context };
       saveCommentaryToCache(pageIndex, result);
       if (pageIndex === current) renderCommentaryState(result);
     } catch (e) {
@@ -1294,7 +1328,7 @@
       const delBtn = document.createElement('button');
       delBtn.className = 'mn-delete-btn';
       delBtn.setAttribute('aria-label', '削除');
-      attachDeleteConfirm(delBtn, function() { deleteNoteByKey(current, note.key); });
+      attachDeleteConfirm(delBtn, function() { deleteNoteByKey(current, note.key); }, note.word);
       div.appendChild(delBtn);
       if (!note._repairing) {
         const refreshBtn = document.createElement('button');
@@ -1838,7 +1872,7 @@
         const delBtn = document.createElement('button');
         delBtn.className = 'vocab-delete-btn';
         delBtn.setAttribute('aria-label', '削除');
-        attachDeleteConfirm(delBtn, function() { deleteNoteByKey(p, note.key); });
+        attachDeleteConfirm(delBtn, function() { deleteNoteByKey(p, note.key); }, note.word);
         item.appendChild(delBtn);
         if (!note._repairing) {
           const refreshBtn = document.createElement('button');
