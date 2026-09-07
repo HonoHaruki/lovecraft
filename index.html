@@ -171,6 +171,62 @@
     font-size: 0.8rem !important;
   }
 
+  /* ---------- 読み上げボタン(共通) ---------- */
+  .speak-btn {
+    flex: none !important;
+    background: none !important;
+    border: 1px solid #3a3527 !important;
+    color: var(--accent) !important;
+    border-radius: 50% !important;
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    font-size: 1.05rem !important;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .speak-btn .speak-icon { display: inline-block; }
+  .speak-btn.loading .speak-icon { animation: speak-pulse 1s infinite ease-in-out; opacity: 0.5; }
+  .speak-btn.playing { border-color: var(--accent) !important; background: rgba(200,160,90,0.12) !important; }
+  .speak-btn.tts-error { border-color: #a05a4a !important; color: #a05a4a !important; }
+  @keyframes speak-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
+
+  /* 小さい読み上げボタン(単語・引用ブロック用) */
+  .speak-btn-sm {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px;
+    border: 1px solid #3a3527;
+    background: none;
+    color: #8a8370;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+  .speak-btn-sm.loading { animation: speak-pulse 1s infinite ease-in-out; }
+  .speak-btn-sm.playing { border-color: var(--accent); color: var(--accent); }
+  .speak-btn-sm.tts-error { border-color: #a05a4a; color: #a05a4a; }
+
+  #tts-toast {
+    position: fixed;
+    left: 50%; bottom: 90px;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a1712;
+    color: #e8dfc4;
+    border: 1px solid #3a3527;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.82rem;
+    max-width: 80vw;
+    text-align: center;
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #tts-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #tts-toast.err { border-color: #a05a4a; color: #e8b0a0; }
+
   /* ---------- 日本語訳: 本文カラムだけに重なるボトムシート ---------- */
   /* 高さは常に固定(中身の長さでは変わらない)。中身が長ければ#jp-textの中だけがスクロールする。
      高さの実際の値(半分/全画面)はJS側で実測してheightに直接設定する(dvhや%指定はブラウザ差で崩れるため) */
@@ -259,6 +315,7 @@
     font-style: italic;
     margin-bottom: 12px;
   }
+  .jc-quote-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
   .jc-quote {
     font-family: 'EB Garamond', Georgia, serif;
     font-style: italic;
@@ -268,8 +325,11 @@
     background: rgba(255,255,255,0.04);
     border-left: 3px solid var(--accent);
     padding: 10px 14px;
-    margin-bottom: 6px;
+    margin-bottom: 0;
+    flex: 1;
   }
+  .jc-quote-row .speak-btn-sm { margin-left: 0; margin-top: 10px; flex: none; }
+  .jc-vocab-list .speak-btn-sm { margin-right: 6px; }
   .jc-grammar-point {
     margin-top: 12px;
     padding: 10px 12px;
@@ -570,12 +630,13 @@
 
   /* ---------- 単語選択シート ---------- */
   .word-sheet-box { text-align: center; }
+  .ws-phrase-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px; }
   .word-sheet-box .ws-phrase {
     font-family: Georgia, serif;
     font-style: italic;
     font-size: 1.25rem;
     color: var(--ink);
-    margin-bottom: 4px;
+    margin-bottom: 0;
     word-break: break-word;
   }
   .word-sheet-box .ws-pos {
@@ -767,6 +828,7 @@
         <button id="btn-prev">前へ</button>
         <div class="page-num" id="page-num"></div>
         <button id="btn-next">次へ</button>
+        <button class="speak-btn" id="btn-speak-page" aria-label="本文を読み上げ"><span class="speak-icon">&#128266;</span></button>
         <button class="btn-jp-toggle" id="btn-toggle-jp">訳</button>
       </div>
     </div>
@@ -819,7 +881,10 @@
 
   <div class="modal-overlay" id="word-sheet-modal">
     <div class="modal-box word-sheet-box">
-      <div class="ws-phrase" id="ws-phrase"></div>
+      <div class="ws-phrase-row">
+        <div class="ws-phrase" id="ws-phrase"></div>
+        <button class="speak-btn-sm" id="ws-speak-btn" aria-label="読み上げ"><span class="speak-icon">&#128266;</span></button>
+      </div>
       <div class="ws-pos" id="ws-pos"></div>
       <div class="ws-preview" id="ws-preview"></div>
       <div class="ws-extend-row" id="ws-extend-row">
@@ -832,6 +897,8 @@
       </div>
     </div>
   </div>
+
+  <div id="tts-toast"></div>
 
   <div id="vocab-screen">
     <div class="vocab-header">
@@ -964,6 +1031,286 @@
     return text.trim();
   }
 
+  // ================= 高品質読み上げ(Gemini TTS) =================
+  // MTGアプリでの反省を踏まえ、失敗や無音は必ず画面上に見える形にする。
+  const TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+  const TTS_VOICE = 'Algenib';
+  const TTS_MIN_BYTES = 2000; // これより小さいデータは壊れている(無音)とみなす
+
+  // ---------- トースト通知 ----------
+  let ttsToastTimer = null;
+  function showTtsToast(msg, isError) {
+    const el = document.getElementById('tts-toast');
+    el.textContent = msg;
+    el.classList.toggle('err', !!isError);
+    el.classList.add('show');
+    clearTimeout(ttsToastTimer);
+    ttsToastTimer = setTimeout(function() { el.classList.remove('show'); }, 3200);
+  }
+
+  // ---------- IndexedDBへの永続キャッシュ ----------
+  let ttsDbPromise = null;
+  function openTtsDb() {
+    if (ttsDbPromise) return ttsDbPromise;
+    ttsDbPromise = new Promise(function(resolve, reject) {
+      const req = indexedDB.open('lovecraft_tts_db', 1);
+      req.onupgradeneeded = function() {
+        req.result.createObjectStore('audio');
+      };
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    });
+    return ttsDbPromise;
+  }
+  async function idbGetAudio(key) {
+    try {
+      const db = await openTtsDb();
+      return await new Promise(function(resolve, reject) {
+        const tx = db.transaction('audio', 'readonly');
+        const req = tx.objectStore('audio').get(key);
+        req.onsuccess = function() {
+          const blob = req.result;
+          // 壊れた(小さすぎる)データはキャッシュヒットとして扱わない
+          if (blob && blob.size >= TTS_MIN_BYTES) resolve(blob);
+          else resolve(null);
+        };
+        req.onerror = function() { reject(req.error); };
+      });
+    } catch (e) {
+      console.warn('TTSキャッシュの読込に失敗:', e);
+      return null;
+    }
+  }
+  async function idbSaveAudio(key, blob) {
+    if (!blob || blob.size < TTS_MIN_BYTES) return; // 壊れたデータは保存しない
+    try {
+      const db = await openTtsDb();
+      await new Promise(function(resolve, reject) {
+        const tx = db.transaction('audio', 'readwrite');
+        tx.objectStore('audio').put(blob, key);
+        tx.oncomplete = resolve;
+        tx.onerror = function() { reject(tx.error); };
+      });
+    } catch (e) {
+      console.warn('TTSキャッシュの保存に失敗:', e);
+    }
+  }
+
+  // 24kHz/16bit/モノラルの生PCMデータ(Gemini TTSの出力形式)をWAV再生可能なBlobに変換する
+  function pcmBase64ToWavBlob(base64Data, sampleRate) {
+    sampleRate = sampleRate || 24000;
+    const binary = atob(base64Data);
+    const len = binary.length;
+    const pcmBytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) pcmBytes[i] = binary.charCodeAt(i);
+    const numChannels = 1, bitsPerSample = 16;
+    const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+    const blockAlign = numChannels * bitsPerSample / 8;
+    const buffer = new ArrayBuffer(44 + len);
+    const view = new DataView(buffer);
+    function writeString(offset, str) {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + len, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, 'data');
+    view.setUint32(40, len, true);
+    new Uint8Array(buffer, 44).set(pcmBytes);
+    return new Blob([buffer], { type: 'audio/wav' });
+  }
+
+  async function callGeminiTTS(promptText) {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error('APIキー未設定');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function() { controller.abort(); }, 30000);
+    let res;
+    try {
+      res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + TTS_MODEL + ':generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: promptText }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } }
+          }
+        }),
+        signal: controller.signal
+      });
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('タイムアウト(30秒)');
+      throw e;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (!res.ok) {
+      const errData = await res.json().catch(function() { return {}; });
+      throw new Error((errData && errData.error && errData.error.message) || ('HTTP ' + res.status));
+    }
+    const data = await res.json();
+    const part = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
+      data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].inlineData;
+    if (!part || !part.data) throw new Error('音声データが取得できませんでした');
+    return part; // { mimeType, data(base64) }
+  }
+
+  // ---------- 生成・キャッシュ取得の統括(メモリ→IndexedDB→新規生成の順) ----------
+  const ttsMemCache = new Map(); // cacheKey -> objectURL (このセッション中のみ)
+  const ttsInFlight = new Map(); // cacheKey -> 進行中のPromise(同時多重リクエスト防止)
+
+  function ttsCacheKeyFor(text) {
+    // キーが長くなりすぎないよう、簡易ハッシュ化する
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) { hash = (hash * 31 + text.charCodeAt(i)) | 0; }
+    return 'p:' + hash + ':' + text.length;
+  }
+
+  async function ensureTtsAudioUrl(text) {
+    const cacheKey = ttsCacheKeyFor(text);
+    if (ttsMemCache.has(cacheKey)) return ttsMemCache.get(cacheKey);
+    if (ttsInFlight.has(cacheKey)) return ttsInFlight.get(cacheKey);
+
+    const task = (async function() {
+      const cachedBlob = await idbGetAudio(cacheKey);
+      if (cachedBlob) {
+        const url = URL.createObjectURL(cachedBlob);
+        ttsMemCache.set(cacheKey, url);
+        return url;
+      }
+      const promptText = '以下の英文を、古い恐怖小説の語り手が息を潜めて物語るような、情感のこもった自然な英語の朗読として読み上げてください。' +
+        '英語学習者にも聞き取りやすいよう、はっきりと、ゆったりめのペースで話してください。\n\n' + text;
+      const part = await callGeminiTTS(promptText);
+      const rateMatch = /rate=(\d+)/.exec(part.mimeType || '');
+      const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+      const blob = pcmBase64ToWavBlob(part.data, sampleRate);
+      if (blob.size < TTS_MIN_BYTES) throw new Error('生成された音声データが不正です(無音の可能性)');
+      await idbSaveAudio(cacheKey, blob);
+      const url = URL.createObjectURL(blob);
+      ttsMemCache.set(cacheKey, url);
+      return url;
+    })();
+    ttsInFlight.set(cacheKey, task);
+    try {
+      return await task;
+    } finally {
+      ttsInFlight.delete(cacheKey);
+    }
+  }
+
+  // ページを開いた時などに、裏側でこっそり音声を用意しておく(押した瞬間にすぐ再生するため)
+  function prefetchTtsAudio(text) {
+    if (!text || !getApiKey()) return;
+    const cacheKey = ttsCacheKeyFor(text);
+    if (ttsMemCache.has(cacheKey) || ttsInFlight.has(cacheKey)) return;
+    ensureTtsAudioUrl(text).catch(function(e) {
+      console.warn('音声の先読みに失敗:', e);
+      // 先読みの失敗はまだユーザー操作が無いので、ここではトースト表示しない
+    });
+  }
+
+  let currentTtsAudioEl = null;
+  let currentTtsBtns = [];
+
+  function clearTtsButtonStates() {
+    currentTtsBtns.forEach(function(b) { b.classList.remove('loading', 'playing', 'tts-error'); });
+    currentTtsBtns = [];
+  }
+
+  // 高品質読み上げの再生(本文・引用ブロック用)。btnsは見た目を連動させたいボタンの配列
+  async function playHighQualityTts(text, btns) {
+    if (!text) return;
+    if (currentTtsAudioEl) { currentTtsAudioEl.pause(); currentTtsAudioEl = null; }
+    clearTtsButtonStates();
+    if (!getApiKey()) {
+      showTtsToast('APIキー未設定です（右上の設定から入力してください）', true);
+      return;
+    }
+    currentTtsBtns = btns || [];
+    currentTtsBtns.forEach(function(b) { b.classList.add('loading'); });
+
+    let url;
+    try {
+      url = await ensureTtsAudioUrl(text);
+    } catch (e) {
+      console.warn('高品質音声の生成に失敗:', e);
+      currentTtsBtns.forEach(function(b) { b.classList.remove('loading'); b.classList.add('tts-error'); });
+      showTtsToast('音声の生成に失敗しました（' + e.message + '）', true);
+      setTimeout(function() { currentTtsBtns.forEach(function(b) { b.classList.remove('tts-error'); }); }, 2500);
+      return;
+    }
+
+    const audio = new Audio(url);
+    currentTtsAudioEl = audio;
+    let hasStartedPlaying = false;
+    const silenceTimer = setTimeout(function() {
+      if (!hasStartedPlaying) {
+        audio.pause();
+        currentTtsBtns.forEach(function(b) { b.classList.remove('loading'); b.classList.add('tts-error'); });
+        showTtsToast('音声の再生を開始できませんでした（無音の可能性があります）', true);
+        setTimeout(function() { currentTtsBtns.forEach(function(b) { b.classList.remove('tts-error'); }); }, 2500);
+      }
+    }, 2500);
+    audio.addEventListener('playing', function() {
+      hasStartedPlaying = true;
+      clearTimeout(silenceTimer);
+      currentTtsBtns.forEach(function(b) { b.classList.remove('loading'); b.classList.add('playing'); });
+    });
+    audio.addEventListener('ended', function() {
+      currentTtsBtns.forEach(function(b) { b.classList.remove('playing'); });
+      if (currentTtsAudioEl === audio) currentTtsAudioEl = null;
+    });
+    audio.addEventListener('error', function() {
+      clearTimeout(silenceTimer);
+      currentTtsBtns.forEach(function(b) { b.classList.remove('loading', 'playing'); b.classList.add('tts-error'); });
+      showTtsToast('音声の再生中にエラーが発生しました', true);
+      setTimeout(function() { currentTtsBtns.forEach(function(b) { b.classList.remove('tts-error'); }); }, 2500);
+      if (currentTtsAudioEl === audio) currentTtsAudioEl = null;
+    });
+    try {
+      await audio.play();
+    } catch (e) {
+      clearTimeout(silenceTimer);
+      currentTtsBtns.forEach(function(b) { b.classList.remove('loading'); b.classList.add('tts-error'); });
+      showTtsToast('音声の再生に失敗しました（' + e.message + '）', true);
+      setTimeout(function() { currentTtsBtns.forEach(function(b) { b.classList.remove('tts-error'); }); }, 2500);
+    }
+  }
+
+  // ---------- 単語・熟語用: ブラウザ標準の音声合成(高品質音声は使わない) ----------
+  // 単語(.mn-word など)のすぐ後ろに簡易読み上げボタンを追加する共通ヘルパー
+  function addWordSpeakBtn(root, word, afterSelector) {
+    const target = root.querySelector(afterSelector || '.mn-word');
+    if (!target || !word) return;
+    const btn = document.createElement('button');
+    btn.className = 'speak-btn-sm';
+    btn.setAttribute('aria-label', '読み上げ');
+    btn.innerHTML = '<span class="speak-icon">&#128266;</span>';
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      speakWordSimple(word);
+    });
+    target.insertAdjacentElement('afterend', btn);
+  }
+
+  function speakWordSimple(text) {
+    if (!text || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US';
+    utter.rate = 0.92;
+    window.speechSynthesis.speak(utter);
+  }
+
   // ---------- 単語の意味キャッシュ(端末内保存、同じ単語を何度も問い合わせない) ----------
   function loadMeaningCache() {
     try { return JSON.parse(localStorage.getItem('lovecraft_word_meanings_v3') || '{}'); }
@@ -1032,7 +1379,8 @@
     } else {
       let html = '';
       if (state.intro) html += '<div class="jc-intro">' + state.intro + '</div>';
-      html += '<div class="jc-quote">' + (state.quote || '') + '</div>';
+      html += '<div class="jc-quote-row"><div class="jc-quote">' + (state.quote || '') + '</div>' +
+        '<button class="speak-btn-sm jc-quote-speak" aria-label="引用を読み上げ"><span class="speak-icon">&#128266;</span></button></div>';
 
       html += '<span class="jc-label">1. 文法解析</span>';
       (state.grammarPoints || []).forEach(function(g) {
@@ -1048,13 +1396,30 @@
 
       html += '<span class="jc-label">2. 重要単語・熟語</span><ul class="jc-vocab-list">';
       (state.vocab || []).forEach(function(v) {
-        html += '<li><span class="jc-vocab-word">' + (v.word || '') + '</span>' + (v.meaning || '') + '</li>';
+        html += '<li><span class="jc-vocab-word">' + (v.word || '') + '</span>' +
+          '<button class="speak-btn-sm jc-vocab-speak" data-word="' + (v.word || '').replace(/"/g, '&quot;') + '" aria-label="単語を読み上げ"><span class="speak-icon">&#128266;</span></button>' +
+          (v.meaning || '') + '</li>';
       });
       html += '</ul>';
 
       html += '<span class="jc-label">3. 文脈ニュアンス</span><div class="jc-context">' + (state.context || '') + '</div>';
 
       body.innerHTML = html;
+
+      const quoteBtn = body.querySelector('.jc-quote-speak');
+      if (quoteBtn && state.quote) {
+        quoteBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          playHighQualityTts(state.quote, [quoteBtn]);
+        });
+        prefetchTtsAudio(state.quote);
+      }
+      body.querySelectorAll('.jc-vocab-speak').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          speakWordSimple(btn.getAttribute('data-word'));
+        });
+      });
     }
   }
 
@@ -1324,6 +1689,7 @@
         }
       }
       listEl.appendChild(div);
+      addWordSpeakBtn(div, note.word);
       const delBtn = document.createElement('button');
       delBtn.className = 'mn-delete-btn';
       delBtn.setAttribute('aria-label', '削除');
@@ -1574,6 +1940,10 @@
     renderWordSheet();
     refreshWordSheetPreview();
   });
+  document.getElementById('ws-speak-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (wsSelection) speakWordSimple(phraseTextFromRanges(wsSelection.ranges));
+  });
   document.getElementById('ws-cancel').addEventListener('click', closeWordSheet);
   document.getElementById('word-sheet-modal').addEventListener('click', function(e) {
     if (e.target === document.getElementById('word-sheet-modal')) closeWordSheet();
@@ -1612,9 +1982,15 @@
     applyHighlightsToDom();
     markTappedWordsOnPage();
     renderMarginList();
-    document.getElementById('page-text').scrollTop = 0;
     ensureHighlightsForPage(current);
+    if (currentTtsAudioEl) { currentTtsAudioEl.pause(); currentTtsAudioEl = null; }
+    clearTtsButtonStates();
+    prefetchTtsAudio(pagesEn[current]);
   }
+
+  document.getElementById('btn-speak-page').addEventListener('click', function() {
+    playHighQualityTts(pagesEn[current], [document.getElementById('btn-speak-page')]);
+  });
 
   document.getElementById('btn-prev').addEventListener('click', function() {
     if (current > 0) { current--; render(); }
@@ -1868,6 +2244,7 @@
           render();
           closeVocabScreen();
         });
+        addWordSpeakBtn(item, note.word);
         const delBtn = document.createElement('button');
         delBtn.className = 'vocab-delete-btn';
         delBtn.setAttribute('aria-label', '削除');
@@ -1951,6 +2328,7 @@
     document.getElementById('quiz-card').addEventListener('click', function() {
       if (!quizFlipped) { quizFlipped = true; renderQuiz(); }
     });
+    addWordSpeakBtn(document.getElementById('quiz-card'), note.word, '.quiz-word');
     if (quizFlipped) {
       document.getElementById('quiz-btn-known').addEventListener('click', function() {
         quizIndex++; quizFlipped = false; renderQuiz();
