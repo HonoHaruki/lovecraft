@@ -933,7 +933,7 @@
     const apiKey = getApiKey();
     const controller = new AbortController();
     // 通信が固まったまま戻ってこない事態を避けるため、20秒でタイムアウトさせる
-    const timeoutId = setTimeout(function() { controller.abort(); }, 20000);
+    const timeoutId = setTimeout(function() { controller.abort(); }, 45000);
     let res;
     try {
       res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent', {
@@ -996,13 +996,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v5') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v6') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v5', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v6', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -1084,14 +1084,13 @@
       '次の5つを作成してください。\n' +
       '1. intro: 本題に入る前の一言(1〜2文)。この場面がどんな情景・感情かに寄り添う、雰囲気のある書き出し\n' +
       '2. quote: 英文原文をそのまま(改変しない)\n' +
-      '3. grammarPoints: 段落の中で特に構造が複雑だったり読み違えやすい箇所を2〜4個だけ選び、それぞれ以下を持つ配列。' +
-      '全ての文を網羅する必要はなく、本当に解説する価値がある箇所だけに絞ってください。\n' +
-      '   ・tag: その箇所の構造の呼び方(例: "主節", "関係副詞節", "分詞構文" など)\n' +
-      '   ・chunks: その箇所の原文を、意味のまとまりごとに区切って並べた配列。それぞれ以下を持つ\n' +
+      '3. grammarPoints: 段落に登場する文を、実際に登場する順で1文残らず全て取り上げた配列(一部だけの抜粋にしないでください)。それぞれ以下を持つ\n' +
+      '   ・tag: その文の構造の呼び方(例: "主節のみ", "主節+関係副詞節", "分詞構文" など)\n' +
+      '   ・chunks: その1文の原文全体を、意味のまとまりごとに区切って並べた配列。それぞれ以下を持つ\n' +
       '      - label: "S"(主語) / "V"(動詞) / "O"(目的語) / "C"(補語) / "M"(修飾語・従属節など、S/V/O/Cに当てはまらないもの) のいずれか\n' +
       '      - text: その部分の原文そのまま\n' +
-      '      (chunksを順番通りに繋げると、そのexcerpt全体の原文に戻ることを確認してください)\n' +
-      '   ・explanation: なぜその構造なのか、どう読めばよいかを、丁寧だが温かい語り口で\n' +
+      '      (chunksを順番通りに繋げると、その文全体の原文に戻ることを確認してください)\n' +
+      '   ・explanation: なぜその構造なのか、どう読めばよいかを、丁寧だが温かい語り口で(単純な文は簡潔に、複雑な文は丁寧に、と長さに緩急をつけてよい)\n' +
       '4. vocab: その段落の中で重要な単語・熟語・言い回しを3〜8個選んだ配列。それぞれ以下を持つ\n' +
       '   ・word: 原文での表記\n' +
       '   ・meaning: 意味やニュアンスに加えて、作者がなぜその言葉を選んだと考えられるかも一言添える\n' +
