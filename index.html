@@ -315,7 +315,6 @@
     font-style: italic;
     margin-bottom: 12px;
   }
-  .jc-quote-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
   .jc-quote {
     font-family: 'EB Garamond', Georgia, serif;
     font-style: italic;
@@ -325,10 +324,8 @@
     background: rgba(255,255,255,0.04);
     border-left: 3px solid var(--accent);
     padding: 10px 14px;
-    margin-bottom: 0;
-    flex: 1;
+    margin-bottom: 6px;
   }
-  .jc-quote-row .speak-btn-sm { margin-left: 0; margin-top: 10px; flex: none; }
   .jc-vocab-list .speak-btn-sm { margin-right: 6px; }
   .jc-grammar-point {
     margin-top: 12px;
@@ -336,6 +333,7 @@
     border-radius: 6px;
     background: rgba(255,255,255,0.03);
   }
+  .jc-grammar-tag-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .jc-grammar-tag {
     display: inline-block;
     font-size: 0.72rem;
@@ -343,7 +341,7 @@
     border: 1px solid var(--accent);
     border-radius: 3px;
     padding: 1px 7px;
-    margin-bottom: 8px;
+    margin-bottom: 0;
   }
   .jc-grammar-chunks {
     margin-bottom: 8px;
@@ -1343,13 +1341,13 @@
 
   // ---------- 本文の解説(文法・構文/内容・文脈)のキャッシュと取得 ----------
   function loadCommentaryCache() {
-    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v6') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('lovecraft_commentary_v7') || '{}'); }
     catch (e) { return {}; }
   }
   function saveCommentaryToCache(pageIndex, obj) {
     const cache = loadCommentaryCache();
     cache[pageIndex] = obj;
-    localStorage.setItem('lovecraft_commentary_v6', JSON.stringify(cache));
+    localStorage.setItem('lovecraft_commentary_v7', JSON.stringify(cache));
   }
   function getCommentaryFromCache(pageIndex) {
     const cache = loadCommentaryCache();
@@ -1379,13 +1377,14 @@
     } else {
       let html = '';
       if (state.intro) html += '<div class="jc-intro">' + state.intro + '</div>';
-      html += '<div class="jc-quote-row"><div class="jc-quote">' + (state.quote || '') + '</div>' +
-        '<button class="speak-btn-sm jc-quote-speak" aria-label="引用を読み上げ"><span class="speak-icon">&#128266;</span></button></div>';
+      html += '<div class="jc-quote">' + (state.quote || '') + '</div>';
 
       html += '<span class="jc-label">1. 文法解析</span>';
-      (state.grammarPoints || []).forEach(function(g) {
+      (state.grammarPoints || []).forEach(function(g, gi) {
+        const sentenceText = (g.chunks || []).map(function(c) { return c.text; }).join(' ');
         html += '<div class="jc-grammar-point">' +
-          '<div class="jc-grammar-tag">' + (g.tag || '') + '</div>' +
+          '<div class="jc-grammar-tag-row"><div class="jc-grammar-tag">' + (g.tag || '') + '</div>' +
+          '<button class="speak-btn-sm jc-grammar-speak" data-gi="' + gi + '" aria-label="この文を読み上げ"><span class="speak-icon">&#128266;</span></button></div>' +
           '<div class="jc-grammar-chunks">' + (g.chunks || []).map(function(c) {
             return '<span class="jc-chunk jc-chunk-' + (c.label || 'M').toUpperCase() + '">' +
               '<span class="jc-chunk-label">' + (c.label || '') + '</span>' + (c.text || '') + '</span>';
@@ -1406,14 +1405,17 @@
 
       body.innerHTML = html;
 
-      const quoteBtn = body.querySelector('.jc-quote-speak');
-      if (quoteBtn && state.quote) {
-        quoteBtn.addEventListener('click', function(e) {
+      body.querySelectorAll('.jc-grammar-speak').forEach(function(btn) {
+        const gi = parseInt(btn.getAttribute('data-gi'), 10);
+        const g = (state.grammarPoints || [])[gi];
+        const sentenceText = g ? (g.chunks || []).map(function(c) { return c.text; }).join(' ') : '';
+        if (!sentenceText) return;
+        prefetchTtsAudio(sentenceText);
+        btn.addEventListener('click', function(e) {
           e.stopPropagation();
-          playHighQualityTts(state.quote, [quoteBtn]);
+          playHighQualityTts(sentenceText, [btn]);
         });
-        prefetchTtsAudio(state.quote);
-      }
+      });
       body.querySelectorAll('.jc-vocab-speak').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
           e.stopPropagation();
@@ -1441,13 +1443,15 @@
 
     const paragraphEn = pagesEn[pageIndex];
     const paragraphJp = pagesJp[pageIndex];
-    const prompt = 'あなたは古い恐怖小説を愛読している、博識で親しみやすい先輩読者です。後輩の英語学習者に、隣に座って語りかけるような温かい調子で、' +
-      '以下の英文の一節を読み解いてあげてください。教科書的な無味乾燥さは避け、丁寧語(です・ます調)は保ちながらも、' +
-      '人間味とホラー作品らしい雰囲気を感じられる語り口にしてください。「〜のだ」「〜である」のような常体は混ぜないでください。\n\n' +
+    const prompt = 'あなたは古い恐怖小説を愛読している、博識な読者です。英語学習者に向けて、以下の英文の一節を読み解いてください。' +
+      '教科書的な無味乾燥さは避け、丁寧語(です・ます調)は保ちながらも、人間味とホラー作品らしい雰囲気をほんのり感じられる語り口にしてください。' +
+      '「〜のだ」「〜である」のような常体は混ぜないでください。' +
+      '一方で、「〜しましょうね」「一緒に読み進めましょう」のように読者に直接語りかける一人称的な誘いかけの表現は使わないでください。' +
+      'あくまで丁寧な解説文であることを保ち、雰囲気は言葉選びや比喩で加える程度に留めてください。\n\n' +
       '英文: ' + paragraphEn + '\n\n' +
       '参考(日本語訳): ' + paragraphJp + '\n\n' +
       '次の5つを作成してください。\n' +
-      '1. intro: 本題に入る前の一言(1〜2文)。この場面がどんな情景・感情かに寄り添う、雰囲気のある書き出し\n' +
+      '1. intro: 本題に入る前の一言(1〜2文)。この場面がどんな情景・感情かに寄り添う、雰囲気のある書き出し(読者への語りかけ調にはしない)\n' +
       '2. quote: 英文原文をそのまま(改変しない)\n' +
       '3. grammarPoints: 段落に登場する文を、実際に登場する順で1文残らず全て取り上げた配列(一部だけの抜粋にしないでください)。それぞれ以下を持つ\n' +
       '   ・tag: その文の構造の呼び方(例: "主節のみ", "主節+関係副詞節", "分詞構文" など)\n' +
@@ -1459,8 +1463,7 @@
       '4. vocab: その段落の中で重要な単語・熟語・言い回しを3〜8個選んだ配列。それぞれ以下を持つ\n' +
       '   ・word: 原文での表記\n' +
       '   ・meaning: 意味やニュアンスに加えて、作者がなぜその言葉を選んだと考えられるかも一言添える\n' +
-      '5. context: この段落で何が起きているか、心情や背景も含めた文脈・ニュアンスの解説(150〜300字程度)。' +
-      '解説というより、隣で物語を語ってくれるような温度感で\n\n' +
+      '5. context: この段落で何が起きているか、心情や背景も含めた文脈・ニュアンスの解説(150〜300字程度、丁寧な解説文として)\n\n' +
       '出力は次のJSON形式のみとし、前置き・コードブロック記号は付けないでください。\n' +
       '{"intro":"...","quote":"...","grammarPoints":[{"tag":"...","chunks":[{"label":"S","text":"..."}],"explanation":"..."}],"vocab":[{"word":"...","meaning":"..."}],"context":"..."}';
 
@@ -2130,12 +2133,14 @@
     if (document.visibilityState !== 'visible') return;
     positionPageOverlay();
     syncFooterHeight();
-    // 戻った直後はブラウザのUI(アドレスバー等)がまだ確定していないことがあるため、
-    // 少し待ってからもう一度実施する
-    setTimeout(function() {
-      positionPageOverlay();
-      syncFooterHeight();
-    }, 300);
+    // 戻った直後はブラウザのUI(アドレスバー等)のサイズがまだ確定していないことがあるため、
+    // タイミングを変えて複数回実施し、どこかで確実に正しい状態に収束させる
+    [50, 150, 350, 700, 1200].forEach(function(delay) {
+      setTimeout(function() {
+        positionPageOverlay();
+        syncFooterHeight();
+      }, delay);
+    });
   }
   document.addEventListener('visibilitychange', resyncLayoutAfterReturn);
   window.addEventListener('pageshow', resyncLayoutAfterReturn);
