@@ -27,23 +27,6 @@
     overflow: hidden;
   }
 
-  /* ---------- 縦向き案内 ---------- */
-  #rotate-notice {
-    display: none;
-    position: fixed; inset: 0;
-    background: var(--bg);
-    z-index: 999;
-    flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center;
-    padding: 40px;
-  }
-  #rotate-notice .icon { font-size: 3rem; margin-bottom: 16px; }
-  #rotate-notice h2 { color: var(--accent); font-family: Georgia, serif; letter-spacing: 2px; margin: 0 0 10px; }
-  #rotate-notice p { color: #8a8370; font-size: 0.9rem; max-width: 320px; line-height: 1.6; }
-  body.is-portrait #rotate-notice { display: flex; }
-  body.is-portrait #app { display: none; }
-
   /* ---------- 全体レイアウト(横向き2分割) ---------- */
   #app {
     display: flex;
@@ -790,12 +773,6 @@
 </style>
 </head>
 <body>
-
-  <div id="rotate-notice">
-    <div class="icon">&#8635;</div>
-    <h2>横向きにしてください</h2>
-    <p>この書物は、横向きに構えた状態で読むよう作られています。<br>iPadを回転させてください。</p>
-  </div>
 
   <div id="app">
     <div class="book-col">
@@ -2165,15 +2142,6 @@
     if (e.target === settingsModal) settingsModal.classList.remove('show');
   });
   updateSettingsButtonState();
-
-  // ---------- 縦向き検知 ----------
-  function checkOrientation() {
-    const isPortrait = window.innerHeight > window.innerWidth;
-    document.body.classList.toggle('is-portrait', isPortrait);
-  }
-  window.addEventListener('resize', checkOrientation);
-  window.addEventListener('orientationchange', checkOrientation);
-  checkOrientation();
 
   // ---------- 文字サイズ調整 ----------
   const FONT_SIZE_MIN = 0.8, FONT_SIZE_MAX = 1.5, FONT_SIZE_STEP = 0.1;
